@@ -134,8 +134,9 @@ def split_insights(
 
         # Handle subfolder
         if create_subfolders:
-            subfolder_path = ensure_subfolder_exists(output_directory, heading)
-            log(f"  Creating/using subfolder: {heading}")
+            subfolder_path, was_created = ensure_subfolder_exists(output_directory, heading)
+            action = "Created" if was_created else "Using existing"
+            log(f"  {action} subfolder: {subfolder_path.name}")
         else:
             subfolder_path = output_directory / heading
             if not subfolder_path.exists():

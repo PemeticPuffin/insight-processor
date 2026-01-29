@@ -25,11 +25,12 @@ class TestEnsureSubfolderExists:
 
     def test_creates_new_subfolder(self, temp_dir):
         """Test creation of a new subfolder."""
-        result = ensure_subfolder_exists(temp_dir, "new_folder")
+        path, created = ensure_subfolder_exists(temp_dir, "new_folder")
 
-        assert result.exists()
-        assert result.is_dir()
-        assert result.name == "new_folder"
+        assert path.exists()
+        assert path.is_dir()
+        assert path.name == "new_folder"
+        assert created is True
 
     def test_returns_existing_subfolder(self, temp_dir):
         """Test that existing subfolder is returned unchanged."""
@@ -40,77 +41,95 @@ class TestEnsureSubfolderExists:
         # Add a file to verify we got the same folder
         (existing / "marker.txt").write_text("marker")
 
-        result = ensure_subfolder_exists(temp_dir, "existing")
+        path, created = ensure_subfolder_exists(temp_dir, "existing")
 
-        assert result == existing
-        assert (result / "marker.txt").exists()
+        assert path == existing
+        assert (path / "marker.txt").exists()
+        assert created is False
 
     def test_creates_nested_parents(self, temp_dir):
         """Test that parent directories are created if needed."""
         # Note: ensure_subfolder_exists uses mkdir(parents=True)
         # But it only creates one level of subfolder
-        result = ensure_subfolder_exists(temp_dir, "new_subfolder")
+        path, created = ensure_subfolder_exists(temp_dir, "new_subfolder")
 
-        assert result.exists()
-        assert result.parent == temp_dir
+        assert path.exists()
+        assert path.parent == temp_dir
+        assert created is True
 
-    def test_folder_with_spaces(self, temp_dir):
-        """Test creation of folder with spaces in name."""
-        result = ensure_subfolder_exists(temp_dir, "folder with spaces")
+    def test_folder_with_spaces_sanitized(self, temp_dir):
+        """Test that folder names with spaces are sanitized."""
+        path, created = ensure_subfolder_exists(temp_dir, "folder with spaces")
 
-        assert result.exists()
-        assert result.name == "folder with spaces"
+        assert path.exists()
+        assert path.name == "folder_with_spaces"  # Spaces become underscores
+        assert created is True
 
     def test_folder_with_special_chars(self, temp_dir):
         """Test folder creation with allowed special characters."""
-        # Some chars are OK in folder names
-        result = ensure_subfolder_exists(temp_dir, "folder-name_v1")
+        # Hyphens and underscores are preserved
+        path, created = ensure_subfolder_exists(temp_dir, "folder-name_v1")
 
-        assert result.exists()
-        assert result.name == "folder-name_v1"
+        assert path.exists()
+        assert path.name == "folder-name_v1"
 
     def test_folder_with_unicode(self, temp_dir):
         """Test folder creation with Unicode characters."""
-        result = ensure_subfolder_exists(temp_dir, "folder_\u00e9\u00e0\u00fc")
+        path, created = ensure_subfolder_exists(temp_dir, "folder_\u00e9\u00e0\u00fc")
 
-        assert result.exists()
+        assert path.exists()
 
-    def test_returns_correct_path_type(self, temp_dir):
-        """Test that return value is a Path object."""
+    def test_returns_correct_types(self, temp_dir):
+        """Test that return value is a tuple of (Path, bool)."""
         result = ensure_subfolder_exists(temp_dir, "test")
 
-        assert isinstance(result, Path)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], Path)
+        assert isinstance(result[1], bool)
 
-    def test_idempotent(self, temp_dir):
-        """Test that calling multiple times gives same result."""
-        result1 = ensure_subfolder_exists(temp_dir, "folder")
-        result2 = ensure_subfolder_exists(temp_dir, "folder")
-        result3 = ensure_subfolder_exists(temp_dir, "folder")
+    def test_idempotent_returns_same_path(self, temp_dir):
+        """Test that calling multiple times gives same path."""
+        path1, created1 = ensure_subfolder_exists(temp_dir, "folder")
+        path2, created2 = ensure_subfolder_exists(temp_dir, "folder")
+        path3, created3 = ensure_subfolder_exists(temp_dir, "folder")
 
-        assert result1 == result2 == result3
+        assert path1 == path2 == path3
+        assert created1 is True   # First call creates
+        assert created2 is False  # Subsequent calls find existing
+        assert created3 is False
 
     def test_empty_folder_name(self, temp_dir):
         """Test with empty folder name."""
-        # This creates a folder with empty name, which resolves to parent
-        result = ensure_subfolder_exists(temp_dir, "")
+        # Empty name after sanitization resolves to parent
+        path, created = ensure_subfolder_exists(temp_dir, "")
 
         # The result is temp_dir / "" which equals temp_dir
-        assert result.exists()
+        assert path.exists()
 
-    def test_folder_name_with_dots(self, temp_dir):
-        """Test folder name containing dots."""
-        result = ensure_subfolder_exists(temp_dir, "folder.name.v2")
+    def test_folder_name_with_dots_sanitized(self, temp_dir):
+        """Test folder name containing dots are removed."""
+        path, created = ensure_subfolder_exists(temp_dir, "folder.name.v2")
 
-        assert result.exists()
-        assert result.name == "folder.name.v2"
+        assert path.exists()
+        # Dots are removed by sanitization
+        assert path.name == "foldernamev2"
 
-    @pytest.mark.skipif(os.name == 'nt', reason="Test uses Unix-specific characters")
-    def test_folder_with_most_special_chars(self, temp_dir):
-        """Test folder with various special characters that are valid on Unix."""
-        # These are valid on Unix but not Windows
-        result = ensure_subfolder_exists(temp_dir, "folder!@#$%name")
+    def test_special_chars_sanitized(self, temp_dir):
+        """Test that special characters are removed by sanitization."""
+        path, created = ensure_subfolder_exists(temp_dir, "folder!@#$%name")
 
-        assert result.exists()
+        assert path.exists()
+        # Special chars removed
+        assert path.name == "foldername"
+
+    def test_role_name_sanitized(self, temp_dir):
+        """Test that role names with special chars are sanitized."""
+        path, created = ensure_subfolder_exists(temp_dir, "CPO - Procurement (GBS)")
+
+        assert path.exists()
+        # Parentheses removed, spaces to underscores
+        assert path.name == "CPO_-_Procurement_GBS"
 
 
 class TestFindMatchingSubfolder:
@@ -298,34 +317,41 @@ class TestFolderUtilsIntegration:
 
     def test_ensure_then_find(self, temp_dir):
         """Test creating a folder and then finding it."""
-        created = ensure_subfolder_exists(temp_dir, "NewFolder")
+        created_path, _ = ensure_subfolder_exists(temp_dir, "NewFolder")
         found = find_matching_subfolder(temp_dir, "NewFolder")
 
-        assert created == found
+        assert created_path == found
 
     def test_ensure_then_find_case_insensitive(self, temp_dir):
         """Test creating folder and finding with different case."""
-        created = ensure_subfolder_exists(temp_dir, "MyFolder")
+        created_path, _ = ensure_subfolder_exists(temp_dir, "MyFolder")
         found = find_matching_subfolder(temp_dir, "myfolder")
 
         # Both should refer to the same folder (case-insensitive match)
         assert found is not None
-        assert found.name.lower() == created.name.lower()
+        assert found.name.lower() == created_path.name.lower()
 
-    def test_typical_workflow(self, temp_dir):
-        """Test typical usage pattern from the application."""
-        # Create role folders
+    def test_typical_workflow_with_sanitization(self, temp_dir):
+        """Test typical usage pattern - names are sanitized but still findable."""
+        # Create role folders (names will be sanitized)
         roles = ["Chief Audit Executive", "General Counsel"]
 
         for role in roles:
-            ensure_subfolder_exists(temp_dir, role)
+            path, created = ensure_subfolder_exists(temp_dir, role)
+            assert created is True
+            # Folder name is sanitized (spaces -> underscores)
+            assert "_" in path.name
 
-        # Later, find them (possibly with different case)
+        # Later, find them using original names (with spaces)
+        # find_matching_subfolder now matches sanitized versions too
         cae = find_matching_subfolder(temp_dir, "chief audit executive")
         gc = find_matching_subfolder(temp_dir, "GENERAL COUNSEL")
 
         assert cae is not None
         assert gc is not None
+        # Verify we found the sanitized folders (case-insensitive comparison for filesystem compatibility)
+        assert cae.name.lower() == "chief_audit_executive"
+        assert gc.name.lower() == "general_counsel"
 
     def test_multiple_ensure_calls(self, temp_dir):
         """Test multiple ensure calls don't create duplicates."""

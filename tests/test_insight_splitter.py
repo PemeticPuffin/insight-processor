@@ -310,8 +310,9 @@ class TestSplitInsights:
 
         split_insights(source_path, output_dir, create_subfolders=True)
 
-        assert (output_dir / "Chief Audit Executive").is_dir()
-        assert (output_dir / "General Counsel").is_dir()
+        # Folder names are sanitized (spaces become underscores)
+        assert (output_dir / "Chief_Audit_Executive").is_dir()
+        assert (output_dir / "General_Counsel").is_dir()
 
     def test_no_heading_2_returns_zero(self, temp_dir):
         """Test document with no Heading 2."""
@@ -420,7 +421,8 @@ class TestSplitInsights:
 
         split_insights(source_path, output_dir)
 
-        expected_file = output_dir / "My Section Name" / "My Section Name.docx"
+        # Folder name is sanitized, but filename keeps original heading
+        expected_file = output_dir / "My_Section_Name" / "My Section Name.docx"
         assert expected_file.exists()
 
 
@@ -506,8 +508,14 @@ class TestInsightSplitterIntegration:
         assert sections_found == 3
 
         # Verify each folder and file exists
-        for role in roles:
-            folder = output_dir / role
+        # Folder names are sanitized (spaces -> underscores), but filenames keep original heading
+        sanitized_roles = [
+            "Chief_Audit_Executive",
+            "General_Counsel",
+            "Tech_CEO",
+        ]
+        for role, sanitized in zip(roles, sanitized_roles):
+            folder = output_dir / sanitized
             assert folder.is_dir()
 
             doc_file = folder / f"{role}.docx"
