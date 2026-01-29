@@ -6,16 +6,19 @@ import re
 from config import ROLE_ABBREVIATIONS
 
 
-def sanitize_for_filename(text: str) -> str:
+def sanitize_for_filename(text: str, max_length: int = 100) -> str:
     """
     Convert text to a safe filename format.
 
     - Strips whitespace
     - Replaces spaces with underscores
     - Removes problematic characters
+    - Truncates to max_length to avoid filesystem limits
 
     Args:
         text: The text to sanitize
+        max_length: Maximum length of the sanitized string (default 100).
+                    Set to 0 or None to disable truncation.
 
     Returns:
         Sanitized string safe for use in filenames
@@ -29,6 +32,12 @@ def sanitize_for_filename(text: str) -> str:
     # Remove any characters that might be problematic in filenames
     # Keep alphanumeric, underscores, and hyphens
     cleaned = re.sub(r'[^\w\-]', '', cleaned)
+
+    # Truncate to max_length if specified
+    if max_length and len(cleaned) > max_length:
+        cleaned = cleaned[:max_length]
+        # Remove trailing underscores or hyphens for cleaner filenames
+        cleaned = cleaned.rstrip('_-')
 
     return cleaned
 

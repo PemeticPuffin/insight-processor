@@ -116,11 +116,12 @@ class TestSanitizeForFilename:
         result = sanitize_for_filename("@#$%^&*()")
         assert result == ""
 
-    def test_very_long_string(self):
-        """Test with a very long string."""
+    def test_very_long_string_truncated(self):
+        """Test that very long strings are truncated to default max_length."""
         long_text = "A" * 1000
         result = sanitize_for_filename(long_text)
-        assert result == long_text  # Should not truncate
+        assert len(result) == 100  # Default max_length
+        assert result == "A" * 100
 
     def test_long_string_with_spaces(self):
         """Test long string with multiple spaces."""
@@ -128,6 +129,40 @@ class TestSanitizeForFilename:
         result = sanitize_for_filename(long_text)
         assert "_" in result
         assert " " not in result
+        assert len(result) <= 100
+
+    def test_truncation_custom_length(self):
+        """Test truncation with custom max_length."""
+        text = "A" * 200
+        result = sanitize_for_filename(text, max_length=50)
+        assert len(result) == 50
+
+    def test_truncation_disabled(self):
+        """Test that truncation can be disabled."""
+        long_text = "A" * 500
+        result = sanitize_for_filename(long_text, max_length=0)
+        assert len(result) == 500
+        result = sanitize_for_filename(long_text, max_length=None)
+        assert len(result) == 500
+
+    def test_truncation_strips_trailing_underscores(self):
+        """Test that truncation removes trailing underscores."""
+        # Create text that will have underscore at position 100
+        text = "A" * 99 + " B" * 50  # Space becomes underscore
+        result = sanitize_for_filename(text)
+        assert not result.endswith("_")
+
+    def test_truncation_strips_trailing_hyphens(self):
+        """Test that truncation removes trailing hyphens."""
+        text = "A" * 99 + "-" + "B" * 50
+        result = sanitize_for_filename(text)
+        assert not result.endswith("-")
+
+    def test_short_string_not_affected(self):
+        """Test that strings under max_length are not affected."""
+        text = "Short Title"
+        result = sanitize_for_filename(text)
+        assert result == "Short_Title"
 
     # Real-world heading tests
     @pytest.mark.parametrize("heading,expected", [
@@ -345,15 +380,14 @@ class TestFilenameSecurityConcerns:
         # Should not contain null bytes
         assert "\x00" not in result
 
-    def test_very_long_filename_not_truncated(self):
-        """Test behavior with filenames longer than filesystem limits."""
+    def test_very_long_filename_truncated_for_safety(self):
+        """Test that filenames are truncated to avoid filesystem limits."""
         # Most filesystems have 255 byte limit
         long_name = "A" * 300
         result = sanitize_for_filename(long_name)
 
-        # Function doesn't truncate - that's a potential issue
-        # but documenting current behavior
-        assert len(result) == 300
+        # Function now truncates to safe length (default 100)
+        assert len(result) == 100
 
     def test_hidden_file_prefix(self):
         """Test handling of hidden file prefix (Unix)."""

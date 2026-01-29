@@ -245,7 +245,7 @@ class TestProcessSingleDocument:
         assert success == True
 
     def test_very_long_third_line(self, temp_dir):
-        """Test with a very long third line."""
+        """Test with a very long third line - should be truncated."""
         doc = Document()
         doc.add_paragraph("Line 1")
         doc.add_paragraph("Line 2")
@@ -259,7 +259,10 @@ class TestProcessSingleDocument:
         )
 
         assert success == True
-        # Filename might be very long - no truncation in current implementation
+        # Filename is now truncated to safe length
+        # Format: 1.15_Folder_AAA...AAA.docx
+        # Max component length is 100, so total should be well under 255
+        assert len(new_filename) < 255
 
 
 class TestCleanAndRenameFiles:
