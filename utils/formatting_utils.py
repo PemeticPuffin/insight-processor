@@ -1,0 +1,193 @@
+"""
+Formatting utility functions for fonts, bullets, and headers.
+"""
+
+import re
+from docx.shared import Pt
+from config import FONT_NAME, FONT_SIZE_PT
+
+
+def set_font_calibri_11pt(paragraph):
+    """
+    Set all runs in a paragraph to Calibri 11pt font.
+
+    Args:
+        paragraph: The paragraph to format
+    """
+    for run in paragraph.runs:
+        run.font.name = FONT_NAME
+        run.font.size = Pt(FONT_SIZE_PT)
+
+
+def bold_paragraph(paragraph):
+    """
+    Make all runs in a paragraph bold.
+
+    Args:
+        paragraph: The paragraph to bold
+    """
+    for run in paragraph.runs:
+        run.bold = True
+
+
+def apply_bullet_style(paragraph):
+    """
+    Apply bullet point style to a paragraph.
+
+    Uses the 'List Bullet' style to ensure dot bullets.
+
+    Args:
+        paragraph: The paragraph to convert to a bullet
+    """
+    paragraph.style = 'List Bullet'
+
+
+def is_intro_line(text: str) -> bool:
+    """
+    Detect if a line is an intro line that should not be bulleted.
+
+    Intro lines are detected by:
+    - Ending with a colon (:)
+    - Being a full sentence (ends with period and has multiple words)
+    - Being a section intro phrase
+
+    Args:
+        text: The text to check
+
+    Returns:
+        True if this appears to be an intro line
+    """
+    text = text.strip()
+
+    if not text:
+        return False
+
+    # Check if ends with colon (intro phrase)
+    if text.endswith(':'):
+        return True
+
+    # Check for common intro patterns
+    intro_patterns = [
+        r'^Here\s+(are|is)\b',
+        r'^The\s+following\b',
+        r'^Consider\s+the\s+following\b',
+        r'^Below\s+(are|is)\b',
+        r'^This\s+includes?\b',
+    ]
+
+    for pattern in intro_patterns:
+        if re.match(pattern, text, re.IGNORECASE):
+            return True
+
+    # Check if it's a full sentence ending with a period and has multiple words
+    # that doesn't start with typical bullet content
+    if text.endswith('.'):
+        words = text.split()
+        # Full sentences typically have at least 5 words and don't start with action verbs
+        # commonly used in bullet points
+        if len(words) >= 5:
+            # Check if it doesn't start with typical bullet-point action verbs
+            action_verbs = ['use', 'apply', 'create', 'develop', 'implement',
+                          'analyze', 'review', 'ensure', 'provide', 'manage']
+            first_word = words[0].lower().rstrip('.,;:')
+            if first_word not in action_verbs:
+                # Additional check: if it contains "you" or "your" in an explanatory context
+                if 'you' in text.lower() or 'your' in text.lower():
+                    return True
+
+    return False
+
+
+def add_spacing_after(paragraph, points: int = 12):
+    """
+    Add spacing after a paragraph.
+
+    Args:
+        paragraph: The paragraph to add spacing to
+        points: The amount of spacing in points (default 12)
+    """
+    paragraph.paragraph_format.space_after = Pt(points)
+
+
+def is_numbered_or_dashed_list(paragraph) -> bool:
+    """
+    Check if a paragraph is a numbered list or uses dashes as bullets.
+
+    Args:
+        paragraph: The paragraph to check
+
+    Returns:
+        True if the paragraph uses numbers or dashes as list markers
+    """
+    text = paragraph.text.strip()
+
+    if not text:
+        return False
+
+    # Check for numbered list patterns (1. or 1) or a. or a))
+    numbered_patterns = [
+        r'^\d+[\.\)]\s',      # 1. or 1)
+        r'^[a-zA-Z][\.\)]\s',  # a. or a)
+        r'^\(\d+\)\s',         # (1)
+        r'^\([a-zA-Z]\)\s',    # (a)
+    ]
+
+    for pattern in numbered_patterns:
+        if re.match(pattern, text):
+            return True
+
+    # Check for dash/hyphen bullet
+    if text.startswith('- ') or text.startswith('– ') or text.startswith('— '):
+        return True
+
+    return False
+
+
+def convert_to_dot_bullet(paragraph):
+    """
+    Convert a numbered or dashed list item to a dot bullet.
+
+    Removes the existing marker and applies bullet style.
+
+    Args:
+        paragraph: The paragraph to convert
+    """
+    text = paragraph.text.strip()
+
+    # Remove numbered list markers
+    numbered_patterns = [
+        r'^\d+[\.\)]\s*',
+        r'^[a-zA-Z][\.\)]\s*',
+        r'^\(\d+\)\s*',
+        r'^\([a-zA-Z]\)\s*',
+    ]
+
+    for pattern in numbered_patterns:
+        text = re.sub(pattern, '', text)
+
+    # Remove dash/hyphen markers
+    if text.startswith('- '):
+        text = text[2:]
+    elif text.startswith('– ') or text.startswith('— '):
+        text = text[2:]
+
+    # Clear and reset the paragraph text
+    if paragraph.runs:
+        # Preserve the first run's formatting
+        first_run = paragraph.runs[0]
+        font_name = first_run.font.name
+        font_size = first_run.font.size
+        is_bold = first_run.bold
+
+        # Clear all runs
+        paragraph.clear()
+
+        # Add new run with cleaned text
+        new_run = paragraph.add_run(text.strip())
+        new_run.font.name = font_name if font_name else FONT_NAME
+        new_run.font.size = font_size if font_size else Pt(FONT_SIZE_PT)
+        if is_bold:
+            new_run.bold = True
+
+    # Apply bullet style
+    apply_bullet_style(paragraph)
