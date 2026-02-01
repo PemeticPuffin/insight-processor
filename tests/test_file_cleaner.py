@@ -5,7 +5,7 @@ These tests challenge the file cleaning logic with:
 - Documents with few paragraphs
 - Special characters in content
 - Filename generation edge cases
-- Backup and rename operations
+- Rename operations
 """
 
 import pytest
@@ -283,11 +283,10 @@ class TestCleanAndRenameFiles:
 
         doc.save(str(subfolder / "TestRole.docx"))
 
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
+        processed, skipped = clean_and_rename_files(temp_dir)
 
         assert processed == 1
         assert skipped == 0
-        assert len(backups) == 1
 
     @freeze_time("2024-01-15")
     def test_calculates_two_mondays_ahead(self, temp_dir):
@@ -307,31 +306,9 @@ class TestCleanAndRenameFiles:
         # Check renamed file has correct date
         # 2 Mondays from Jan 15 (Monday) = Jan 29
         renamed_files = list(subfolder.glob("*.docx"))
-        # Filter out backup files
-        renamed_files = [f for f in renamed_files if "backup" not in f.name]
 
         assert len(renamed_files) == 1
         assert renamed_files[0].name.startswith("1.29_")
-
-    def test_creates_backup(self, temp_dir):
-        """Test that backup is created before renaming."""
-        subfolder = temp_dir / "Role"
-        subfolder.mkdir()
-
-        doc = Document()
-        doc.add_paragraph("Line 1")
-        doc.add_paragraph("Line 2")
-        doc.add_paragraph("Line 3")
-
-        original_path = subfolder / "Role.docx"
-        doc.save(str(original_path))
-
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
-
-        assert len(backups) == 1
-        backup_path = Path(backups[0])
-        assert backup_path.exists()
-        assert "backup" in backup_path.name
 
     def test_skips_no_matching_file(self, temp_dir):
         """Test that subfolders without matching files are skipped."""
@@ -341,11 +318,10 @@ class TestCleanAndRenameFiles:
         doc = Document()
         doc.save(str(subfolder / "DifferentName.docx"))
 
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
+        processed, skipped = clean_and_rename_files(temp_dir)
 
         assert processed == 0
         assert skipped == 1
-        assert len(backups) == 0
 
     def test_skips_files_in_root(self, temp_dir):
         """Test that files in root directory are not processed."""
@@ -353,7 +329,7 @@ class TestCleanAndRenameFiles:
         doc = Document()
         doc.save(str(temp_dir / "RootFile.docx"))
 
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
+        processed, skipped = clean_and_rename_files(temp_dir)
 
         # Root file should not be processed
         assert (temp_dir / "RootFile.docx").exists()
@@ -373,21 +349,19 @@ class TestCleanAndRenameFiles:
 
             doc.save(str(subfolder / f"{role}.docx"))
 
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
+        processed, skipped = clean_and_rename_files(temp_dir)
 
         assert processed == 3
         assert skipped == 0
-        assert len(backups) == 3
 
     def test_non_existent_directory(self, temp_dir):
         """Test with non-existent directory."""
         non_existent = temp_dir / "does_not_exist"
 
-        processed, skipped, backups = clean_and_rename_files(non_existent)
+        processed, skipped = clean_and_rename_files(non_existent)
 
         assert processed == 0
         assert skipped == 0
-        assert backups == []
 
     def test_progress_callback(self, temp_dir):
         """Test that progress callback is called."""
@@ -417,7 +391,7 @@ class TestCleanAndRenameFiles:
         doc.add_paragraph("Only one line")
         doc.save(str(subfolder / "Role.docx"))
 
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
+        processed, skipped = clean_and_rename_files(temp_dir)
 
         assert processed == 0
         assert skipped == 1
@@ -448,7 +422,7 @@ class TestFileCleanerIntegration:
 
             doc.save(str(subfolder / f"{role}.docx"))
 
-        processed, skipped, backups = clean_and_rename_files(temp_dir)
+        processed, skipped = clean_and_rename_files(temp_dir)
 
         assert processed == 3
 
@@ -456,13 +430,11 @@ class TestFileCleanerIntegration:
         for role, title in roles_and_titles:
             subfolder = temp_dir / role
             files = list(subfolder.glob("*.docx"))
-            # Filter out backups
-            renamed = [f for f in files if "backup" not in f.name]
 
-            assert len(renamed) == 1
+            assert len(files) == 1
             # Check filename contains sanitized title
-            assert title.replace(" ", "_") in renamed[0].name or \
-                   title.split()[0] in renamed[0].name
+            assert title.replace(" ", "_") in files[0].name or \
+                   title.split()[0] in files[0].name
 
     @freeze_time("2024-12-28")  # Near year end
     def test_year_boundary_date(self, temp_dir):
@@ -479,8 +451,7 @@ class TestFileCleanerIntegration:
         clean_and_rename_files(temp_dir)
 
         files = list(subfolder.glob("*.docx"))
-        renamed = [f for f in files if "backup" not in f.name]
 
         # Date should be in January 2025 (2 Mondays from Dec 28)
         # Dec 30 is first Monday, Jan 6 is second Monday
-        assert renamed[0].name.startswith("1.")  # January
+        assert files[0].name.startswith("1.")  # January

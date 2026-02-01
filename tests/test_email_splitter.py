@@ -221,6 +221,49 @@ class TestParseEmailDocument:
         for role in roles:
             assert role in sections
 
+    def test_service_executive_partner_detection(self, temp_dir):
+        """Test that Service Executive Partner heading is detected as EP."""
+        doc = Document()
+        doc.add_heading("Chief Audit Executive", level=2)
+        doc.add_heading("SALES BUSINESS DEVELOPER PROSPECT EMAIL", level=3)
+        doc.add_paragraph("BD content")
+        doc.add_heading("Service Executive Partner Client Email", level=3)
+        doc.add_paragraph("EP content - should be separate")
+
+        doc_path = temp_dir / "ep_test.docx"
+        doc.save(str(doc_path))
+
+        sections = parse_email_document(doc_path)
+
+        cae = sections["Chief Audit Executive"]
+        assert cae['BD']['heading'] is not None
+        assert cae['EP']['heading'] is not None
+        assert len(cae['BD']['content']) == 1
+        assert len(cae['EP']['content']) == 1
+        assert "BD content" in cae['BD']['content'][0].text
+        assert "EP content" in cae['EP']['content'][0].text
+
+    def test_all_three_template_types(self, temp_dir):
+        """Test document with BD, AE, and EP templates."""
+        doc = Document()
+        doc.add_heading("Chief Audit Executive", level=2)
+        doc.add_heading("SALES BUSINESS DEVELOPER PROSPECT EMAIL", level=3)
+        doc.add_paragraph("BD content")
+        doc.add_heading("SALES ACCOUNT EXECUTIVE CLIENT EMAIL", level=3)
+        doc.add_paragraph("AE content")
+        doc.add_heading("Service Executive Partner Client Email", level=3)
+        doc.add_paragraph("EP content")
+
+        doc_path = temp_dir / "all_templates.docx"
+        doc.save(str(doc_path))
+
+        sections = parse_email_document(doc_path)
+
+        cae = sections["Chief Audit Executive"]
+        assert cae['BD']['heading'] is not None
+        assert cae['AE']['heading'] is not None
+        assert cae['EP']['heading'] is not None
+
 
 class TestCreateEmailDocument:
     """Tests for create_email_document function."""
@@ -384,12 +427,12 @@ class TestSplitEmails:
         assert created_files == []
 
     @freeze_time("2024-01-15")
-    def test_creates_backup_of_existing(self, temp_dir):
-        """Test that existing files are backed up."""
+    def test_overwrites_existing(self, temp_dir):
+        """Test that existing files are overwritten."""
         doc = Document()
         doc.add_heading("Chief Audit Executive", level=2)
         doc.add_heading("SALES BUSINESS DEVELOPER PROSPECT EMAIL", level=3)
-        doc.add_paragraph("BD content")
+        doc.add_paragraph("BD content - new")
 
         source = temp_dir / "emails.docx"
         doc.save(str(source))
@@ -401,15 +444,18 @@ class TestSplitEmails:
 
         # Create existing file
         existing_doc = Document()
-        existing_doc.add_paragraph("Existing content")
+        existing_doc.add_paragraph("Existing content - old")
         # Date prefix for Jan 15 + 2 Mondays = 1.29
-        existing_doc.save(str(cae_folder / "1.29_CAE_BD_AE_emails.docx"))
+        existing_path = cae_folder / "1.29_CAE_BD_AE_emails.docx"
+        existing_doc.save(str(existing_path))
 
         split_emails(source, target)
 
-        # Check backup was created
-        backup_files = list(cae_folder.glob("*backup*.docx"))
-        assert len(backup_files) >= 1
+        # Check file was overwritten (no backups, content changed)
+        assert existing_path.exists()
+        updated_doc = Document(existing_path)
+        content = " ".join([p.text for p in updated_doc.paragraphs])
+        assert "new" in content.lower() or "BD content" in content
 
     def test_progress_callback(self, temp_dir, email_template_docx):
         """Test progress callback."""

@@ -57,12 +57,12 @@ class TestEnsureSubfolderExists:
         assert path.parent == temp_dir
         assert created is True
 
-    def test_folder_with_spaces_sanitized(self, temp_dir):
-        """Test that folder names with spaces are sanitized."""
+    def test_folder_with_spaces_preserved(self, temp_dir):
+        """Test that folder names with spaces are preserved (no underscores)."""
         path, created = ensure_subfolder_exists(temp_dir, "folder with spaces")
 
         assert path.exists()
-        assert path.name == "folder_with_spaces"  # Spaces become underscores
+        assert path.name == "folder with spaces"  # Spaces preserved for unknown roles
         assert created is True
 
     def test_folder_with_special_chars(self, temp_dir):
@@ -107,29 +107,29 @@ class TestEnsureSubfolderExists:
         # The result is temp_dir / "" which equals temp_dir
         assert path.exists()
 
-    def test_folder_name_with_dots_sanitized(self, temp_dir):
-        """Test folder name containing dots are removed."""
+    def test_folder_name_with_dots_preserved(self, temp_dir):
+        """Test folder name containing dots are preserved."""
         path, created = ensure_subfolder_exists(temp_dir, "folder.name.v2")
 
         assert path.exists()
-        # Dots are removed by sanitization
-        assert path.name == "foldernamev2"
+        # Dots are preserved (only dangerous chars like /\\:*?"<>| removed)
+        assert path.name == "folder.name.v2"
 
     def test_special_chars_sanitized(self, temp_dir):
-        """Test that special characters are removed by sanitization."""
-        path, created = ensure_subfolder_exists(temp_dir, "folder!@#$%name")
+        """Test that dangerous characters are removed by sanitization."""
+        path, created = ensure_subfolder_exists(temp_dir, "folder:name")
 
         assert path.exists()
-        # Special chars removed
+        # Dangerous chars (like :) removed, but safe chars preserved
         assert path.name == "foldername"
 
-    def test_role_name_sanitized(self, temp_dir):
-        """Test that role names with special chars are sanitized."""
+    def test_known_role_uses_canonical_name(self, temp_dir):
+        """Test that known roles use their canonical folder name."""
         path, created = ensure_subfolder_exists(temp_dir, "CPO - Procurement (GBS)")
 
         assert path.exists()
-        # Parentheses removed, spaces to underscores
-        assert path.name == "CPO_-_Procurement_GBS"
+        # Known role uses canonical name from ROLE_FOLDER_DEFINITIONS
+        assert path.name == "CPO GBS"
 
 
 class TestFindMatchingSubfolder:
@@ -331,27 +331,24 @@ class TestFolderUtilsIntegration:
         assert found is not None
         assert found.name.lower() == created_path.name.lower()
 
-    def test_typical_workflow_with_sanitization(self, temp_dir):
-        """Test typical usage pattern - names are sanitized but still findable."""
-        # Create role folders (names will be sanitized)
+    def test_typical_workflow_with_role_mapping(self, temp_dir):
+        """Test typical usage pattern - known roles use canonical names."""
+        # Create role folders (known roles use canonical names)
         roles = ["Chief Audit Executive", "General Counsel"]
 
         for role in roles:
             path, created = ensure_subfolder_exists(temp_dir, role)
             assert created is True
-            # Folder name is sanitized (spaces -> underscores)
-            assert "_" in path.name
 
-        # Later, find them using original names (with spaces)
-        # find_matching_subfolder now matches sanitized versions too
+        # Later, find them using original names or variants (case-insensitive)
         cae = find_matching_subfolder(temp_dir, "chief audit executive")
         gc = find_matching_subfolder(temp_dir, "GENERAL COUNSEL")
 
         assert cae is not None
         assert gc is not None
-        # Verify we found the sanitized folders (case-insensitive comparison for filesystem compatibility)
-        assert cae.name.lower() == "chief_audit_executive"
-        assert gc.name.lower() == "general_counsel"
+        # Verify we found the canonical folders
+        assert cae.name == "CAE"
+        assert gc.name == "GC"
 
     def test_multiple_ensure_calls(self, temp_dir):
         """Test multiple ensure calls don't create duplicates."""

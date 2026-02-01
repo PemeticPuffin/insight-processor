@@ -11,21 +11,16 @@ Combines four Word document processing operations:
 
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from processors.insight_splitter import split_insights, get_heading_list
+from processors.insight_splitter import split_insights
 from processors.file_cleaner import clean_and_rename_files
 from processors.insight_formatter import format_insights
 from processors.email_splitter import split_emails
-from qc.validators import (
-    validate_insights_document,
-    validate_emails_document,
-    validate_split_files,
-    validate_formatting,
-)
+from qc.validators import validate_insights_document, validate_emails_document
 from utils.file_utils import validate_docx
 
 
@@ -175,7 +170,7 @@ class InsightProcessor:
         self.log("\nStep 2: Clean/Rename Files")
         self.log("-" * 40)
 
-        processed, skipped, backups = clean_and_rename_files(
+        processed, skipped = clean_and_rename_files(
             self.output_dir,
             progress_callback=lambda m: self.log(f"  {m}")
         )

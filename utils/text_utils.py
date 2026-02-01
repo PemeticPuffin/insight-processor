@@ -3,7 +3,7 @@ Text utility functions for filename sanitization and role abbreviations.
 """
 
 import re
-from config import ROLE_ABBREVIATIONS
+from config import ROLE_ABBREVIATIONS, ROLE_FOLDER_DEFINITIONS
 
 
 def sanitize_for_filename(text: str, max_length: int = 100) -> str:
@@ -46,6 +46,9 @@ def get_role_abbreviation(heading: str) -> str:
     """
     Get the abbreviated form of a role/heading.
 
+    Uses role folder definitions to find the canonical short name,
+    falling back to ROLE_ABBREVIATIONS for additional mappings.
+
     Args:
         heading: The full heading text (e.g., "Chief Audit Executive")
 
@@ -53,7 +56,15 @@ def get_role_abbreviation(heading: str) -> str:
         The abbreviation (e.g., "CAE") or the original text with
         spaces replaced by underscores if no mapping exists
     """
-    # Check for exact match in role map
+    heading_lower = heading.strip().lower()
+
+    # First check role folder definitions (case-insensitive)
+    for create_name, synonyms in ROLE_FOLDER_DEFINITIONS:
+        for synonym in synonyms:
+            if synonym.lower() == heading_lower:
+                return create_name
+
+    # Check for exact match in role abbreviations map
     if heading in ROLE_ABBREVIATIONS:
         return ROLE_ABBREVIATIONS[heading]
 

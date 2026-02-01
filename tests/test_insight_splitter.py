@@ -310,9 +310,9 @@ class TestSplitInsights:
 
         split_insights(source_path, output_dir, create_subfolders=True)
 
-        # Folder names are sanitized (spaces become underscores)
-        assert (output_dir / "Chief_Audit_Executive").is_dir()
-        assert (output_dir / "General_Counsel").is_dir()
+        # Known roles use canonical folder names
+        assert (output_dir / "CAE").is_dir()
+        assert (output_dir / "GC").is_dir()
 
     def test_no_heading_2_returns_zero(self, temp_dir):
         """Test document with no Heading 2."""
@@ -421,8 +421,8 @@ class TestSplitInsights:
 
         split_insights(source_path, output_dir)
 
-        # Folder name is sanitized, but filename keeps original heading
-        expected_file = output_dir / "My_Section_Name" / "My Section Name.docx"
+        # Unknown roles keep spaces in folder name, filename keeps original heading
+        expected_file = output_dir / "My Section Name" / "My Section Name.docx"
         assert expected_file.exists()
 
 
@@ -508,14 +508,14 @@ class TestInsightSplitterIntegration:
         assert sections_found == 3
 
         # Verify each folder and file exists
-        # Folder names are sanitized (spaces -> underscores), but filenames keep original heading
-        sanitized_roles = [
-            "Chief_Audit_Executive",
-            "General_Counsel",
-            "Tech_CEO",
+        # Known roles use canonical folder names, filenames keep original heading
+        canonical_folders = [
+            "CAE",
+            "GC",
+            "TCEO",
         ]
-        for role, sanitized in zip(roles, sanitized_roles):
-            folder = output_dir / sanitized
+        for role, canonical in zip(roles, canonical_folders):
+            folder = output_dir / canonical
             assert folder.is_dir()
 
             doc_file = folder / f"{role}.docx"

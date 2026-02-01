@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.text_utils import sanitize_for_filename, get_role_abbreviation
-from config import ROLE_ABBREVIATIONS
+from config import ROLE_ABBREVIATIONS, ROLE_FOLDER_DEFINITIONS
 
 
 class TestSanitizeForFilename:
@@ -211,26 +211,39 @@ class TestGetRoleAbbreviation:
     # Test all defined role mappings
     @pytest.mark.parametrize("role,expected", [
         ("Chief Audit Executive", "CAE"),
-        ("CPO - Procurement (GBS)", "CPO_GBS"),
-        ("CPO - Product (HT)", "CPO_GTS"),
+        ("CPO - Procurement (GBS)", "CPO GBS"),
+        ("CPO - Product (HT)", "CPO HT"),
         ("R&D", "RD"),
         ("Customer Service", "CS"),
         ("General Counsel", "GC"),
         ("Tech CEO", "TCEO"),
+        ("Tech CMO", "TCMO"),
+        ("AI Leader", "AIL"),
+        ("Tech Services Leader", "TSL"),
+        ("CIO", "CIO"),
+        ("CHRO", "CHRO"),
+        ("CSCO", "CSCO"),
+        ("CMO", "CMO"),
+        ("CDAO", "CDAO"),
+        ("CSO", "CSO"),
+        ("CFO", "CFO"),
+        ("CISO", "CISO"),
     ])
     def test_known_role_abbreviations(self, role, expected):
         """Test all defined role abbreviations."""
         result = get_role_abbreviation(role)
         assert result == expected
 
-    def test_all_roles_in_config(self):
-        """Verify we test all roles defined in config."""
-        tested_roles = {
-            "Chief Audit Executive", "CPO - Procurement (GBS)",
-            "CPO - Product (HT)", "R&D", "Customer Service",
-            "General Counsel", "Tech CEO"
+    def test_all_role_definitions_covered(self):
+        """Verify we have role folder definitions for all expected roles."""
+        # Check that ROLE_FOLDER_DEFINITIONS has all the expected roles
+        create_names = {defn[0] for defn in ROLE_FOLDER_DEFINITIONS}
+        expected_create_names = {
+            "CIO", "TCMO", "CHRO", "CSCO", "CMO", "CS", "RD", "CAE",
+            "AIL", "CDAO", "CSO", "TCEO", "CPO GBS", "CPO HT", "CFO",
+            "GC", "TSL", "CISO"
         }
-        assert tested_roles == set(ROLE_ABBREVIATIONS.keys())
+        assert create_names == expected_create_names
 
     # Unknown roles fall back to sanitization
     def test_unknown_role_sanitized(self):
@@ -243,29 +256,28 @@ class TestGetRoleAbbreviation:
         result = get_role_abbreviation("IT & Security (Team)")
         assert result == "IT__Security_Team"
 
-    # Case sensitivity tests
-    def test_case_sensitive_exact_match(self):
-        """Verify role matching is case-sensitive."""
-        # Lowercase should NOT match
+    # Case insensitivity tests
+    def test_case_insensitive_match_lowercase(self):
+        """Verify role matching is case-insensitive."""
+        # Lowercase should match
         result = get_role_abbreviation("chief audit executive")
-        assert result != "CAE"
-        assert result == "chief_audit_executive"
+        assert result == "CAE"
 
-    def test_mixed_case_no_match(self):
-        """Test that mixed case doesn't match defined roles."""
+    def test_case_insensitive_match_uppercase(self):
+        """Test that uppercase matches defined roles."""
         result = get_role_abbreviation("CHIEF AUDIT EXECUTIVE")
-        assert result != "CAE"
+        assert result == "CAE"
 
     def test_partial_match_no_match(self):
         """Test that partial matches don't work."""
         result = get_role_abbreviation("Chief Audit")
         assert result == "Chief_Audit"
 
-    def test_extra_whitespace_no_match(self):
-        """Test that extra whitespace prevents matching."""
+    def test_whitespace_stripped_before_match(self):
+        """Test that leading/trailing whitespace is stripped before matching."""
         result = get_role_abbreviation(" Chief Audit Executive ")
-        # Leading/trailing spaces - won't match exact
-        assert result == "Chief_Audit_Executive"
+        # Whitespace is stripped, then matches
+        assert result == "CAE"
 
     # Edge cases
     def test_empty_string(self):

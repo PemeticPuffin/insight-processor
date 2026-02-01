@@ -19,7 +19,6 @@ from config import FONT_NAME, FONT_SIZE_PT
 from utils.date_utils import get_two_mondays_from_now, format_date_for_filename
 from utils.text_utils import get_role_abbreviation
 from utils.folder_utils import find_matching_subfolder
-from utils.file_utils import backup_file
 
 
 def apply_font_formatting(doc: Document):
@@ -111,23 +110,26 @@ def parse_email_document(doc_path: Path) -> Dict[str, Dict[str, Any]]:
         elif para.style.name == 'Heading 3' and current_job:
             heading_text = para.text.strip().upper()
 
+            # Check for BD (Sales Business Developer / Prospect Email)
             if 'SALES BUSINESS DEVELOPER' in heading_text or 'PROSPECT EMAIL' in heading_text:
                 current_heading3 = 'BD'
                 sections[current_job]['BD']['heading'] = para
+            # Check for AE (Sales Account Executive)
             elif 'SALES ACCOUNT EXECUTIVE' in heading_text:
                 current_heading3 = 'AE'
                 sections[current_job]['AE']['heading'] = para
-            elif 'CLIENT EMAIL' in heading_text and 'SALES' not in heading_text:
-                # AE client email (not service)
-                if 'SERVICE' not in heading_text:
-                    current_heading3 = 'AE'
-                    sections[current_job]['AE']['heading'] = para
+            # Check for EP (Service Executive Partner) - must check BEFORE generic CLIENT EMAIL
             elif 'SERVICE EXECUTIVE PARTNER' in heading_text:
                 current_heading3 = 'EP'
                 sections[current_job]['EP']['heading'] = para
+            # Check for EP (Service Client Email)
             elif 'SERVICE' in heading_text and 'CLIENT' in heading_text:
                 current_heading3 = 'EP'
                 sections[current_job]['EP']['heading'] = para
+            # Check for AE (Client Email without Sales or Service)
+            elif 'CLIENT EMAIL' in heading_text and 'SALES' not in heading_text and 'SERVICE' not in heading_text:
+                current_heading3 = 'AE'
+                sections[current_job]['AE']['heading'] = para
 
         # Add content to current section
         elif current_heading3 and current_job:
@@ -227,11 +229,6 @@ def split_emails(
             bd_ae_filename = f"{date_prefix}_{role}_BD_AE_emails.docx"
             bd_ae_path = subfolder / bd_ae_filename
 
-            # Backup if exists
-            if bd_ae_path.exists():
-                backup_path = backup_file(bd_ae_path)
-                log(f"  Backed up existing: {backup_path.name}")
-
             bd_ae_doc.save(str(bd_ae_path))
             log(f"  Created: {bd_ae_filename}")
             created_files.append(str(bd_ae_path))
@@ -244,11 +241,6 @@ def split_emails(
             )
             ep_filename = f"{date_prefix}_{role}_EP_email.docx"
             ep_path = subfolder / ep_filename
-
-            # Backup if exists
-            if ep_path.exists():
-                backup_path = backup_file(ep_path)
-                log(f"  Backed up existing: {backup_path.name}")
 
             ep_doc.save(str(ep_path))
             log(f"  Created: {ep_filename}")

@@ -9,14 +9,13 @@ Processes Word documents in subfolders:
 
 from pathlib import Path
 from docx import Document
-from typing import Tuple, List, Optional
+from typing import Tuple, Optional
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.date_utils import get_two_mondays_from_now, format_date_for_filename
 from utils.text_utils import sanitize_for_filename
-from utils.file_utils import backup_file
 
 
 def find_matching_word_file(subfolder_path: Path, subfolder_name: str) -> Optional[Path]:
@@ -67,10 +66,12 @@ def process_single_document(
         # Get the 3rd line (index 2) before deletion
         third_line = paragraphs[2].text.strip()
 
-        # Delete the first line (clear the first non-empty paragraph)
+        # Delete the first line (remove the first non-empty paragraph entirely)
         for para in doc.paragraphs:
             if para.text.strip():
-                para.clear()
+                # Remove the paragraph element from the document
+                p = para._element
+                p.getparent().remove(p)
                 break
 
         # Save the modified document
@@ -91,7 +92,7 @@ def process_single_document(
 def clean_and_rename_files(
     root_directory: Path,
     progress_callback=None
-) -> Tuple[int, int, List[str]]:
+) -> Tuple[int, int]:
     """
     Process all Word documents in subfolders of the root directory.
 
@@ -100,7 +101,7 @@ def clean_and_rename_files(
         progress_callback: Optional callback function(message: str)
 
     Returns:
-        Tuple of (files_processed, files_skipped, list of backup paths)
+        Tuple of (files_processed, files_skipped)
     """
     def log(msg):
         if progress_callback:
@@ -110,7 +111,7 @@ def clean_and_rename_files(
 
     if not root_directory.exists():
         log(f"Error: Directory '{root_directory}' does not exist.")
-        return 0, 0, []
+        return 0, 0
 
     # Calculate the target date (2 Mondays from now)
     target_date = get_two_mondays_from_now()
@@ -120,7 +121,6 @@ def clean_and_rename_files(
 
     processed_count = 0
     skipped_count = 0
-    backup_paths = []
 
     # Iterate through all subdirectories
     for subfolder in sorted(root_directory.iterdir()):
@@ -139,11 +139,6 @@ def clean_and_rename_files(
             continue
 
         log(f"  Found file: {word_file.name}")
-
-        # Create backup before processing
-        backup_path = backup_file(word_file)
-        backup_paths.append(str(backup_path))
-        log(f"  Backed up to: {backup_path.name}")
 
         # Process the document
         success, message, new_filename = process_single_document(
@@ -166,4 +161,4 @@ def clean_and_rename_files(
             log(f"  {message}. Skipping.")
             skipped_count += 1
 
-    return processed_count, skipped_count, backup_paths
+    return processed_count, skipped_count

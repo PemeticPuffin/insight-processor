@@ -17,7 +17,7 @@ from typing import Tuple, List, Set
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import HEADERS_TO_BOLD, BULLET_SECTIONS
+from config import HEADERS_TO_BOLD, BULLET_SECTION_HEADERS
 from utils.formatting_utils import (
     set_font_calibri_11pt,
     bold_paragraph,
@@ -40,6 +40,9 @@ def get_section_ranges(doc: Document) -> List[Tuple[int, int]]:
     """
     Identify paragraph indices for sections that need bullet points.
 
+    For each header in BULLET_SECTION_HEADERS, bullets are applied to content
+    from that header until the next header in HEADERS_TO_BOLD (or end of document).
+
     Args:
         doc: The Document to analyze
 
@@ -47,39 +50,30 @@ def get_section_ranges(doc: Document) -> List[Tuple[int, int]]:
         List of (start_idx, end_idx) tuples for bullet sections
     """
     ranges = []
-    header_positions = {}
 
-    # Find positions of all headers
+    # Find positions of all recognized headers
+    header_positions = []  # List of (idx, header_text) tuples
     for idx, para in enumerate(doc.paragraphs):
         text = para.text.strip()
         if text in HEADERS_TO_BOLD:
-            header_positions[text] = idx
+            header_positions.append((idx, text))
 
-    # Calculate ranges for bullet sections
-    for start_header, end_header in BULLET_SECTIONS:
-        if start_header in header_positions:
-            start_idx = header_positions[start_header] + 1  # Start after the header
+    # Sort by position (should already be sorted, but be safe)
+    header_positions.sort(key=lambda x: x[0])
 
-            if end_header is None:
-                # Go to end of document or next header
-                end_idx = len(doc.paragraphs)
-                # Find the next header after start
-                for header, pos in header_positions.items():
-                    if pos > header_positions[start_header] and pos < end_idx:
-                        if header not in [start_header]:
-                            # Check if this header comes after in the BULLET_SECTIONS
-                            for s, e in BULLET_SECTIONS:
-                                if e == header:
-                                    end_idx = pos
-                                    break
-            elif end_header in header_positions:
-                # Go until the next header (exclusive)
-                end_idx = header_positions[end_header]
+    # For each header that should have bulleted content
+    for i, (idx, header_text) in enumerate(header_positions):
+        if header_text in BULLET_SECTION_HEADERS:
+            start_idx = idx + 1  # Start after the header
+
+            # Find the next header position (or end of document)
+            if i + 1 < len(header_positions):
+                end_idx = header_positions[i + 1][0]
             else:
-                # If end header not found, skip this section
-                continue
+                end_idx = len(doc.paragraphs)
 
-            ranges.append((start_idx, end_idx))
+            if start_idx < end_idx:
+                ranges.append((start_idx, end_idx))
 
     return ranges
 
