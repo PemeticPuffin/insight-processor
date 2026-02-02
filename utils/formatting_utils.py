@@ -188,9 +188,35 @@ def add_spacing_after(paragraph, points: int = 12):
     paragraph.paragraph_format.space_after = Pt(points)
 
 
+def has_word_numbering(paragraph) -> bool:
+    """
+    Check if a paragraph has Word-level automatic numbering (numPr in XML).
+
+    This detects numbering that's applied through Word's list feature,
+    which doesn't appear in the paragraph text but renders as numbers.
+
+    Args:
+        paragraph: The paragraph to check
+
+    Returns:
+        True if the paragraph has Word-level numbering
+    """
+    p_element = paragraph._element
+    pPr = p_element.find(qn('w:pPr'))
+    if pPr is not None:
+        numPr = pPr.find(qn('w:numPr'))
+        if numPr is not None:
+            return True
+    return False
+
+
 def is_numbered_or_dashed_list(paragraph) -> bool:
     """
     Check if a paragraph is a numbered list or uses dashes as bullets.
+
+    Checks both:
+    1. Text-level patterns (e.g., "1. Item" as literal text)
+    2. Word-level numbering (numPr in XML, renders as numbers but not in text)
 
     Args:
         paragraph: The paragraph to check
@@ -198,6 +224,10 @@ def is_numbered_or_dashed_list(paragraph) -> bool:
     Returns:
         True if the paragraph uses numbers or dashes as list markers
     """
+    # First check for Word-level automatic numbering
+    if has_word_numbering(paragraph):
+        return True
+
     text = paragraph.text.strip()
 
     if not text:
