@@ -36,7 +36,7 @@ def is_header(paragraph) -> bool:
     return text in HEADERS_TO_BOLD
 
 
-def get_section_ranges(doc: Document) -> List[Tuple[int, int]]:
+def get_section_ranges(doc: Document) -> List[Tuple[int, int, int]]:
     """
     Identify paragraph indices for sections that need bullet points.
 
@@ -47,7 +47,8 @@ def get_section_ranges(doc: Document) -> List[Tuple[int, int]]:
         doc: The Document to analyze
 
     Returns:
-        List of (start_idx, end_idx) tuples for bullet sections
+        List of (start_idx, end_idx, first_content_idx) tuples for bullet sections
+        first_content_idx is the index of the first non-empty paragraph in the section
     """
     ranges = []
 
@@ -72,8 +73,15 @@ def get_section_ranges(doc: Document) -> List[Tuple[int, int]]:
             else:
                 end_idx = len(doc.paragraphs)
 
+            # Find the first non-empty paragraph in this section
+            first_content_idx = -1
+            for j in range(start_idx, end_idx):
+                if doc.paragraphs[j].text.strip():
+                    first_content_idx = j
+                    break
+
             if start_idx < end_idx:
-                ranges.append((start_idx, end_idx))
+                ranges.append((start_idx, end_idx, first_content_idx))
 
     return ranges
 
@@ -113,8 +121,12 @@ def format_single_document(file_path: Path) -> Tuple[bool, str]:
 
         # Create a set of paragraph indices that should be bulleted
         bullet_indices: Set[int] = set()
-        for start, end in bullet_ranges:
+        # Track which indices are the first content paragraph in their section
+        first_in_section: Set[int] = set()
+        for start, end, first_content_idx in bullet_ranges:
             bullet_indices.update(range(start, end))
+            if first_content_idx >= 0:
+                first_in_section.add(first_content_idx)
 
         # Find title paragraph for spacing
         title_idx = find_title_paragraph(doc)
@@ -135,7 +147,8 @@ def format_single_document(file_path: Path) -> Tuple[bool, str]:
             # Handle bullet sections
             elif idx in bullet_indices and para.text.strip():
                 # Check if this is an intro line that should NOT be bulleted
-                if is_intro_line(para.text):
+                is_first = idx in first_in_section
+                if is_intro_line(para.text, is_first_in_section=is_first):
                     continue
 
                 # Check if it's a numbered or dashed list that needs conversion

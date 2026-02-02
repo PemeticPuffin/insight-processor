@@ -127,14 +127,14 @@ class TestParseEmailDocument:
 
     def test_parses_basic_structure(self, email_template_docx):
         """Test parsing basic email template structure."""
-        sections = parse_email_document(email_template_docx)
+        sections, _ = parse_email_document(email_template_docx)
 
         assert "Chief Audit Executive" in sections
         assert "General Counsel" in sections
 
     def test_extracts_bd_section(self, email_template_docx):
         """Test extraction of BD (Business Developer) section."""
-        sections = parse_email_document(email_template_docx)
+        sections, _ = parse_email_document(email_template_docx)
 
         cae = sections["Chief Audit Executive"]
         assert cae['BD']['heading'] is not None
@@ -142,7 +142,7 @@ class TestParseEmailDocument:
 
     def test_extracts_ae_section(self, email_template_docx):
         """Test extraction of AE (Account Executive) section."""
-        sections = parse_email_document(email_template_docx)
+        sections, _ = parse_email_document(email_template_docx)
 
         cae = sections["Chief Audit Executive"]
         assert cae['AE']['heading'] is not None
@@ -161,13 +161,13 @@ class TestParseEmailDocument:
         doc_path = temp_dir / "ep_test.docx"
         doc.save(str(doc_path))
 
-        sections = parse_email_document(doc_path)
+        sections, _ = parse_email_document(doc_path)
         cae = sections["Chief Audit Executive"]
         assert cae['EP']['heading'] is not None
 
     def test_empty_document(self, empty_docx):
         """Test with empty document."""
-        sections = parse_email_document(empty_docx)
+        sections, _ = parse_email_document(empty_docx)
 
         assert sections == {}
 
@@ -180,7 +180,7 @@ class TestParseEmailDocument:
         doc_path = temp_dir / "no_h3.docx"
         doc.save(str(doc_path))
 
-        sections = parse_email_document(doc_path)
+        sections, _ = parse_email_document(doc_path)
 
         assert "Chief Audit Executive" in sections
         # All template types should be empty
@@ -196,7 +196,7 @@ class TestParseEmailDocument:
         doc_path = temp_dir / "bd_only.docx"
         doc.save(str(doc_path))
 
-        sections = parse_email_document(doc_path)
+        sections, _ = parse_email_document(doc_path)
 
         cae = sections["Chief Audit Executive"]
         assert cae['BD']['heading'] is not None
@@ -216,7 +216,7 @@ class TestParseEmailDocument:
         doc_path = temp_dir / "multi_role.docx"
         doc.save(str(doc_path))
 
-        sections = parse_email_document(doc_path)
+        sections, _ = parse_email_document(doc_path)
 
         for role in roles:
             assert role in sections
@@ -233,7 +233,7 @@ class TestParseEmailDocument:
         doc_path = temp_dir / "ep_test.docx"
         doc.save(str(doc_path))
 
-        sections = parse_email_document(doc_path)
+        sections, _ = parse_email_document(doc_path)
 
         cae = sections["Chief Audit Executive"]
         assert cae['BD']['heading'] is not None
@@ -257,7 +257,7 @@ class TestParseEmailDocument:
         doc_path = temp_dir / "all_templates.docx"
         doc.save(str(doc_path))
 
-        sections = parse_email_document(doc_path)
+        sections, _ = parse_email_document(doc_path)
 
         cae = sections["Chief Audit Executive"]
         assert cae['BD']['heading'] is not None

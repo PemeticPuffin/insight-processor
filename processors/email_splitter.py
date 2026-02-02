@@ -10,6 +10,7 @@ from pathlib import Path
 from copy import deepcopy
 from docx import Document
 from docx.shared import Pt
+from docx.oxml.ns import qn
 from typing import Dict, List, Tuple, Any, Optional
 
 import sys
@@ -19,6 +20,9 @@ from config import FONT_NAME, FONT_SIZE_PT
 from utils.date_utils import get_two_mondays_from_now, format_date_for_filename
 from utils.text_utils import get_role_abbreviation
 from utils.folder_utils import find_matching_subfolder
+
+# XML namespace for relationships
+HYPERLINK_TAG = qn('w:hyperlink')
 
 
 def apply_font_formatting(doc: Document):
@@ -34,13 +38,16 @@ def apply_font_formatting(doc: Document):
             run.font.size = Pt(FONT_SIZE_PT)
 
 
-def copy_paragraph_with_formatting(source_para, target_doc) -> Any:
+def copy_paragraph_with_formatting(source_para, target_doc, source_doc=None) -> Any:
     """
     Copy a paragraph with all its formatting to target document.
+
+    Properly handles hyperlinks by re-creating relationships in the target document.
 
     Args:
         source_para: The source paragraph
         target_doc: The target Document object
+        source_doc: The source Document object (needed for hyperlink relationships)
 
     Returns:
         The new paragraph in the target document
@@ -75,12 +82,37 @@ def copy_paragraph_with_formatting(source_para, target_doc) -> Any:
     new_para._element.clear_content()
 
     for child in source_para._element:
-        new_para._element.append(deepcopy(child))
+        child_copy = deepcopy(child)
+
+        # Handle hyperlinks - need to re-create relationship in target document
+        if child_copy.tag == HYPERLINK_TAG and source_doc is not None:
+            # Get the relationship ID from the hyperlink
+            r_id = child_copy.get(qn('r:id'))
+            if r_id:
+                # Look up the URL in the source document's relationships
+                try:
+                    source_part = source_doc.part
+                    rel = source_part.rels.get(r_id)
+                    if rel and rel.target_ref:
+                        # Add new relationship in target document
+                        new_rel = target_doc.part.relate_to(
+                            rel.target_ref,
+                            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+                            is_external=True
+                        )
+                        # Update the hyperlink element with the new relationship ID
+                        child_copy.set(qn('r:id'), new_rel)
+                except Exception:
+                    # If relationship lookup fails, remove the r:id to avoid corruption
+                    if child_copy.get(qn('r:id')):
+                        del child_copy.attrib[qn('r:id')]
+
+        new_para._element.append(child_copy)
 
     return new_para
 
 
-def parse_email_document(doc_path: Path) -> Dict[str, Dict[str, Any]]:
+def parse_email_document(doc_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Document]:
     """
     Parse the Word document and extract job sections with email templates.
 
@@ -88,7 +120,7 @@ def parse_email_document(doc_path: Path) -> Dict[str, Dict[str, Any]]:
         doc_path: Path to the email templates document
 
     Returns:
-        Dict mapping job titles to their email templates
+        Tuple of (Dict mapping job titles to their email templates, source Document)
     """
     doc = Document(doc_path)
     sections = {}
@@ -135,12 +167,13 @@ def parse_email_document(doc_path: Path) -> Dict[str, Dict[str, Any]]:
         elif current_heading3 and current_job:
             sections[current_job][current_heading3]['content'].append(para)
 
-    return sections
+    return sections, doc
 
 
 def create_email_document(
     heading_paras: List[Any],
-    content_paras_list: List[List[Any]]
+    content_paras_list: List[List[Any]],
+    source_doc: Document = None
 ) -> Document:
     """
     Create a new Word document with headings and content.
@@ -148,6 +181,7 @@ def create_email_document(
     Args:
         heading_paras: List of heading paragraphs
         content_paras_list: List of lists of content paragraphs
+        source_doc: Source Document object (needed for hyperlink relationships)
 
     Returns:
         New Document with the combined content
@@ -157,11 +191,11 @@ def create_email_document(
     for heading_para, content_paras in zip(heading_paras, content_paras_list):
         # Add heading
         if heading_para:
-            copy_paragraph_with_formatting(heading_para, doc)
+            copy_paragraph_with_formatting(heading_para, doc, source_doc)
 
         # Add content
         for para in content_paras:
-            copy_paragraph_with_formatting(para, doc)
+            copy_paragraph_with_formatting(para, doc, source_doc)
 
     # Apply Calibri 11pt formatting
     apply_font_formatting(doc)
@@ -192,7 +226,7 @@ def split_emails(
             print(msg)
 
     log(f"Reading source document: {source_doc_path.name}")
-    sections = parse_email_document(source_doc_path)
+    sections, source_doc = parse_email_document(source_doc_path)
 
     # Calculate date prefix
     target_date = get_two_mondays_from_now()
@@ -224,7 +258,8 @@ def split_emails(
         if templates['BD']['heading'] or templates['AE']['heading']:
             bd_ae_doc = create_email_document(
                 [templates['BD']['heading'], templates['AE']['heading']],
-                [templates['BD']['content'], templates['AE']['content']]
+                [templates['BD']['content'], templates['AE']['content']],
+                source_doc
             )
             bd_ae_filename = f"{date_prefix}_{role}_BD_AE_emails.docx"
             bd_ae_path = subfolder / bd_ae_filename
@@ -237,7 +272,8 @@ def split_emails(
         if templates['EP']['heading']:
             ep_doc = create_email_document(
                 [templates['EP']['heading']],
-                [templates['EP']['content']]
+                [templates['EP']['content']],
+                source_doc
             )
             ep_filename = f"{date_prefix}_{role}_EP_email.docx"
             ep_path = subfolder / ep_filename

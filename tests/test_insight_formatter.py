@@ -98,8 +98,9 @@ class TestGetSectionRanges:
         ranges = get_section_ranges(doc)
 
         # Should find range from Why This Matters to Implications
-        # (start after header, end at next header)
-        assert (1, 3) in ranges
+        # (start after header, end at next header, first_content_idx)
+        # The first non-empty content is at index 1
+        assert (1, 3, 1) in ranges
 
     def test_no_headers_returns_empty(self, temp_dir):
         """Test document without configured headers."""

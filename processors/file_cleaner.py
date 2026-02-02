@@ -16,11 +16,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.date_utils import get_two_mondays_from_now, format_date_for_filename
 from utils.text_utils import sanitize_for_filename
+from utils.folder_utils import get_role_folder_info
 
 
 def find_matching_word_file(subfolder_path: Path, subfolder_name: str) -> Optional[Path]:
     """
     Find a Word document that matches the subfolder name.
+
+    Uses role mapping to check all synonym variants when the subfolder
+    is a known role (e.g., "CAE" folder may contain "Chief Audit Executive.docx").
 
     Args:
         subfolder_path: Path to the subfolder
@@ -29,11 +33,32 @@ def find_matching_word_file(subfolder_path: Path, subfolder_name: str) -> Option
     Returns:
         Path to the matching file, or None if not found
     """
-    # Look for .docx files
-    for ext in ['.docx']:
-        potential_file = subfolder_path / f"{subfolder_name}{ext}"
+    # Get all possible names to search for
+    names_to_check = [subfolder_name]
+
+    # Check if this subfolder is a known role and get all synonyms
+    role_info = get_role_folder_info(subfolder_name)
+    if role_info:
+        _, synonyms = role_info
+        # Add all synonyms to the search list (avoiding duplicates)
+        for synonym in synonyms:
+            if synonym not in names_to_check:
+                names_to_check.append(synonym)
+
+    # Try exact match on each possible name
+    for name in names_to_check:
+        potential_file = subfolder_path / f"{name}.docx"
         if potential_file.exists():
             return potential_file
+
+    # Try case-insensitive match as fallback
+    names_lower = [n.lower() for n in names_to_check]
+    for file in subfolder_path.iterdir():
+        if file.is_file() and file.suffix.lower() == '.docx':
+            file_stem_lower = file.stem.lower()
+            if file_stem_lower in names_lower:
+                return file
+
     return None
 
 

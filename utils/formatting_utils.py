@@ -4,6 +4,7 @@ Formatting utility functions for fonts, bullets, and headers.
 
 import re
 from docx.shared import Pt
+from docx.oxml.ns import qn
 from config import FONT_NAME, FONT_SIZE_PT
 
 
@@ -30,29 +31,54 @@ def bold_paragraph(paragraph):
         run.bold = True
 
 
+def remove_numbering(paragraph):
+    """
+    Remove any existing numbering/list properties from a paragraph.
+
+    This clears the numPr (numbering properties) element from the paragraph's XML,
+    which is necessary because Word's numbering at the XML level overrides styles.
+
+    Args:
+        paragraph: The paragraph to remove numbering from
+    """
+    p_element = paragraph._element
+    # Find and remove numPr (numbering properties) element
+    numPr = p_element.find(qn('w:pPr'))
+    if numPr is not None:
+        num_element = numPr.find(qn('w:numPr'))
+        if num_element is not None:
+            numPr.remove(num_element)
+
+
 def apply_bullet_style(paragraph):
     """
     Apply bullet point style to a paragraph.
 
-    Uses the 'List Bullet' style to ensure dot bullets.
+    Removes any existing numbering and uses the 'List Bullet' style
+    to ensure dot bullets.
 
     Args:
         paragraph: The paragraph to convert to a bullet
     """
+    # First, remove any existing numbering properties that would override the style
+    remove_numbering(paragraph)
+    # Apply the List Bullet style
     paragraph.style = 'List Bullet'
 
 
-def is_intro_line(text: str) -> bool:
+def is_intro_line(text: str, is_first_in_section: bool = False) -> bool:
     """
     Detect if a line is an intro line that should not be bulleted.
 
     Intro lines are detected by:
     - Ending with a colon (:)
-    - Being a full sentence (ends with period and has multiple words)
-    - Being a section intro phrase
+    - Being a section intro phrase (e.g., "Here are", "The following")
+    - Being the first line of a section AND being a complete sentence
+    - Being a full sentence with explanatory context (contains "you/your")
 
     Args:
         text: The text to check
+        is_first_in_section: True if this is the first non-empty paragraph after a section header
 
     Returns:
         True if this appears to be an intro line
@@ -79,16 +105,30 @@ def is_intro_line(text: str) -> bool:
         if re.match(pattern, text, re.IGNORECASE):
             return True
 
-    # Check if it's a full sentence ending with a period and has multiple words
-    # that doesn't start with typical bullet content
+    # Check if it's a full sentence ending with a period
     if text.endswith('.'):
         words = text.split()
+
+        # If this is the first line in a section and it's a complete sentence,
+        # treat it as an intro line (these are typically context-setting sentences)
+        if is_first_in_section and len(words) >= 4:
+            # Check if it doesn't look like a bullet point (doesn't start with action verbs)
+            action_verbs = ['use', 'apply', 'create', 'develop', 'implement',
+                          'analyze', 'review', 'ensure', 'provide', 'manage',
+                          'identify', 'define', 'establish', 'build', 'leverage',
+                          'drive', 'enable', 'support', 'deliver', 'achieve']
+            first_word = words[0].lower().rstrip('.,;:')
+            if first_word not in action_verbs:
+                return True
+
         # Full sentences typically have at least 5 words and don't start with action verbs
         # commonly used in bullet points
         if len(words) >= 5:
             # Check if it doesn't start with typical bullet-point action verbs
             action_verbs = ['use', 'apply', 'create', 'develop', 'implement',
-                          'analyze', 'review', 'ensure', 'provide', 'manage']
+                          'analyze', 'review', 'ensure', 'provide', 'manage',
+                          'identify', 'define', 'establish', 'build', 'leverage',
+                          'drive', 'enable', 'support', 'deliver', 'achieve']
             first_word = words[0].lower().rstrip('.,;:')
             if first_word not in action_verbs:
                 # Additional check: if it contains "you" or "your" in an explanatory context
