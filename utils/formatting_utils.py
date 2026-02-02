@@ -34,59 +34,73 @@ def bold_paragraph(paragraph):
         run.bold = True
 
 
-def remove_numbering(paragraph):
+def clear_all_list_formatting(paragraph):
     """
-    Remove any existing numbering/list properties from a paragraph.
+    Aggressively remove ALL list-related formatting from a paragraph.
 
-    This clears the numPr (numbering properties) element from the paragraph's XML,
-    which is necessary because Word's numbering at the XML level overrides styles.
+    This clears numPr and any other list-related elements from the paragraph XML.
+    Also removes the pStyle if it references a list style.
 
     Args:
-        paragraph: The paragraph to remove numbering from
+        paragraph: The paragraph to clear list formatting from
     """
     p_element = paragraph._element
-    # Find the paragraph properties element
     pPr = p_element.find(qn('w:pPr'))
+
     if pPr is not None:
-        # Remove numPr (numbering properties) if present
-        num_element = pPr.find(qn('w:numPr'))
-        if num_element is not None:
+        # Remove numPr (numbering properties)
+        for num_element in pPr.findall(qn('w:numPr')):
             pPr.remove(num_element)
+
+        # Remove any list-related style references
+        for pStyle in pPr.findall(qn('w:pStyle')):
+            style_val = pStyle.get(qn('w:val'), '')
+            if 'List' in style_val or 'Bullet' in style_val or 'Number' in style_val:
+                pPr.remove(pStyle)
+
+    # Also check for numPr directly under the paragraph element (rare but possible)
+    for num_element in p_element.findall(qn('w:numPr')):
+        p_element.remove(num_element)
 
 
 def apply_bullet_style(paragraph):
     """
     Apply bullet point formatting to a paragraph.
 
-    Instead of relying on Word's 'List Bullet' style (which can have
-    numbering configured), this manually adds a bullet character and
-    sets proper indentation for consistent dot bullet appearance.
+    Uses a completely fresh approach to avoid any residual list formatting:
+    1. Extracts the plain text
+    2. Clears ALL paragraph content and formatting
+    3. Rebuilds with bullet character and clean formatting
 
     Args:
         paragraph: The paragraph to convert to a bullet
     """
-    # Remove any existing numbering properties
-    remove_numbering(paragraph)
+    # Get the plain text content (strip any existing bullet chars)
+    text = paragraph.text
+    if text.startswith(BULLET_CHAR):
+        text = text[1:].lstrip('\t ')
 
-    # Set paragraph to Normal style to clear any list formatting
+    # Aggressively clear all list formatting
+    clear_all_list_formatting(paragraph)
+
+    # Set to Normal style
     paragraph.style = 'Normal'
 
-    # Remove numbering again after style change
-    remove_numbering(paragraph)
+    # Clear again after style change (style can re-add formatting)
+    clear_all_list_formatting(paragraph)
 
-    # Check if the paragraph already starts with a bullet character
-    text = paragraph.text
-    if not text.startswith(BULLET_CHAR):
-        # Prepend bullet character with tab
-        if paragraph.runs:
-            # Insert bullet at the beginning of the first run
-            first_run = paragraph.runs[0]
-            first_run.text = BULLET_CHAR + '\t' + first_run.text
-        else:
-            # No runs, add one with the bullet
-            paragraph.add_run(BULLET_CHAR + '\t' + text)
+    # Now completely clear and rebuild the paragraph content
+    paragraph.clear()
 
-    # Set indentation: left indent with hanging indent for bullet alignment
+    # Add fresh run with bullet character, tab, and text
+    run = paragraph.add_run(BULLET_CHAR + '\t' + text.strip())
+    run.font.name = FONT_NAME
+    run.font.size = Pt(FONT_SIZE_PT)
+
+    # Clear any list formatting one more time (to be absolutely sure)
+    clear_all_list_formatting(paragraph)
+
+    # Set indentation for bullet appearance
     paragraph.paragraph_format.left_indent = Inches(0.5)
     paragraph.paragraph_format.first_line_indent = Inches(-0.25)
 
@@ -213,11 +227,17 @@ def convert_to_dot_bullet(paragraph):
     Convert a numbered or dashed list item to a dot bullet.
 
     Removes the existing marker and applies bullet style.
+    Preserves bold formatting if present.
 
     Args:
         paragraph: The paragraph to convert
     """
     text = paragraph.text.strip()
+
+    # Preserve bold state before clearing
+    is_bold = False
+    if paragraph.runs:
+        is_bold = paragraph.runs[0].bold
 
     # Remove numbered list markers
     numbered_patterns = [
@@ -236,23 +256,14 @@ def convert_to_dot_bullet(paragraph):
     elif text.startswith('– ') or text.startswith('— '):
         text = text[2:]
 
-    # Clear and reset the paragraph text
-    if paragraph.runs:
-        # Preserve the first run's formatting
-        first_run = paragraph.runs[0]
-        font_name = first_run.font.name
-        font_size = first_run.font.size
-        is_bold = first_run.bold
+    # Clear and set clean text (apply_bullet_style will rebuild)
+    paragraph.clear()
+    paragraph.add_run(text.strip())
 
-        # Clear all runs
-        paragraph.clear()
-
-        # Add new run with cleaned text
-        new_run = paragraph.add_run(text.strip())
-        new_run.font.name = font_name if font_name else FONT_NAME
-        new_run.font.size = font_size if font_size else Pt(FONT_SIZE_PT)
-        if is_bold:
-            new_run.bold = True
-
-    # Apply bullet style
+    # Apply bullet style (this will clear and rebuild with bullet char)
     apply_bullet_style(paragraph)
+
+    # Re-apply bold if it was set
+    if is_bold and paragraph.runs:
+        for run in paragraph.runs:
+            run.bold = True
