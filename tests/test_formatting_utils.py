@@ -175,14 +175,17 @@ class TestBoldParagraph:
 class TestApplyBulletStyle:
     """Tests for apply_bullet_style function."""
 
-    def test_applies_list_bullet_style(self, temp_dir):
-        """Test that List Bullet style is applied."""
+    def test_applies_bullet_formatting(self, temp_dir):
+        """Test that bullet character and formatting is applied."""
         doc = Document()
         para = doc.add_paragraph("Bullet item")
 
         apply_bullet_style(para)
 
-        assert para.style.name == "List Bullet"
+        # Should have Normal style (not List Bullet which can have numbering)
+        assert para.style.name == "Normal"
+        # Should start with bullet character
+        assert para.text.startswith('\u2022')  # •
 
     def test_multiple_paragraphs(self, temp_dir):
         """Test applying bullets to multiple paragraphs."""
@@ -197,17 +200,20 @@ class TestApplyBulletStyle:
             apply_bullet_style(para)
 
         for para in paras:
-            assert para.style.name == "List Bullet"
+            assert para.style.name == "Normal"
+            assert para.text.startswith('\u2022')  # •
 
     def test_preserves_text_content(self, temp_dir):
-        """Test that text content is preserved."""
+        """Test that text content is preserved (with bullet prefix)."""
         doc = Document()
         original_text = "Important bullet point"
         para = doc.add_paragraph(original_text)
 
         apply_bullet_style(para)
 
-        assert para.text == original_text
+        # Text should contain original content with bullet prefix
+        assert original_text in para.text
+        assert para.text.startswith('\u2022')  # •
 
 
 class TestIsIntroLine:
@@ -464,8 +470,9 @@ class TestConvertToDotBullet:
 
         convert_to_dot_bullet(para)
 
-        assert para.style.name == "List Bullet"
+        assert para.style.name == "Normal"
         assert "1." not in para.text
+        assert para.text.startswith('\u2022')  # •
 
     def test_converts_dash_to_bullet(self, temp_dir):
         """Test converting dash list to bullet."""
@@ -474,8 +481,9 @@ class TestConvertToDotBullet:
 
         convert_to_dot_bullet(para)
 
-        assert para.style.name == "List Bullet"
-        assert para.text.strip() == "Dash item"
+        assert para.style.name == "Normal"
+        assert "Dash item" in para.text
+        assert para.text.startswith('\u2022')  # •
 
     def test_converts_letter_to_bullet(self, temp_dir):
         """Test converting letter list to bullet."""
@@ -484,8 +492,9 @@ class TestConvertToDotBullet:
 
         convert_to_dot_bullet(para)
 
-        assert para.style.name == "List Bullet"
+        assert para.style.name == "Normal"
         assert "a." not in para.text
+        assert para.text.startswith('\u2022')  # •
 
     def test_preserves_font_name(self, temp_dir):
         """Test that font name is preserved."""
@@ -564,8 +573,8 @@ class TestFormattingUtilsIntegration:
         # Convert to bullet
         convert_to_dot_bullet(para)
 
-        assert para.style.name == "List Bullet"
-        assert para.runs[0].font.name == FONT_NAME
+        assert para.style.name == "Normal"
+        assert para.text.startswith('\u2022')  # •
 
     def test_format_header_then_content(self, temp_dir):
         """Test formatting header and content differently."""
@@ -580,7 +589,8 @@ class TestFormattingUtilsIntegration:
         convert_to_dot_bullet(content)
 
         assert header.runs[0].bold == True
-        assert content.style.name == "List Bullet"
+        assert content.style.name == "Normal"
+        assert content.text.startswith('\u2022')  # •
 
     def test_detect_and_convert_list(self, temp_dir):
         """Test detecting list and converting it."""
@@ -590,7 +600,8 @@ class TestFormattingUtilsIntegration:
         if is_numbered_or_dashed_list(para):
             convert_to_dot_bullet(para)
 
-        assert para.style.name == "List Bullet"
+        assert para.style.name == "Normal"
+        assert para.text.startswith('\u2022')  # •
 
     def test_skip_intro_apply_bullet_to_content(self, temp_dir):
         """Test skipping intro line and bulleting content."""
@@ -607,8 +618,8 @@ class TestFormattingUtilsIntegration:
             if not is_intro_line(text):
                 apply_bullet_style(para)
 
-        # Intro should not be bulleted
-        assert intro.style.name != "List Bullet"
+        # Intro should not be bulleted (no bullet char)
+        assert not intro.text.startswith('\u2022')
         # Content should be bulleted
-        assert content1.style.name == "List Bullet"
-        assert content2.style.name == "List Bullet"
+        assert content1.text.startswith('\u2022')  # •
+        assert content2.text.startswith('\u2022')  # •

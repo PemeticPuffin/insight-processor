@@ -3,9 +3,12 @@ Formatting utility functions for fonts, bullets, and headers.
 """
 
 import re
-from docx.shared import Pt
+from docx.shared import Pt, Inches
 from docx.oxml.ns import qn
 from config import FONT_NAME, FONT_SIZE_PT
+
+# Bullet character for manual bullet formatting
+BULLET_CHAR = '\u2022'  # •
 
 
 def set_font_calibri_11pt(paragraph):
@@ -53,24 +56,39 @@ def remove_numbering(paragraph):
 
 def apply_bullet_style(paragraph):
     """
-    Apply bullet point style to a paragraph.
+    Apply bullet point formatting to a paragraph.
 
-    Removes any existing numbering and uses the 'List Bullet' style
-    to ensure dot bullets. Removes numbering both before and after
-    applying the style to handle cases where the style adds numbering.
+    Instead of relying on Word's 'List Bullet' style (which can have
+    numbering configured), this manually adds a bullet character and
+    sets proper indentation for consistent dot bullet appearance.
 
     Args:
         paragraph: The paragraph to convert to a bullet
     """
-    # First, remove any existing numbering properties
+    # Remove any existing numbering properties
     remove_numbering(paragraph)
 
-    # Apply the List Bullet style
-    paragraph.style = 'List Bullet'
+    # Set paragraph to Normal style to clear any list formatting
+    paragraph.style = 'Normal'
 
-    # Remove numbering again - applying a style can re-add numPr
-    # (especially for the first item in a list sequence)
+    # Remove numbering again after style change
     remove_numbering(paragraph)
+
+    # Check if the paragraph already starts with a bullet character
+    text = paragraph.text
+    if not text.startswith(BULLET_CHAR):
+        # Prepend bullet character with tab
+        if paragraph.runs:
+            # Insert bullet at the beginning of the first run
+            first_run = paragraph.runs[0]
+            first_run.text = BULLET_CHAR + '\t' + first_run.text
+        else:
+            # No runs, add one with the bullet
+            paragraph.add_run(BULLET_CHAR + '\t' + text)
+
+    # Set indentation: left indent with hanging indent for bullet alignment
+    paragraph.paragraph_format.left_indent = Inches(0.5)
+    paragraph.paragraph_format.first_line_indent = Inches(-0.25)
 
 
 def is_intro_line(text: str, is_first_in_section: bool = False) -> bool:
