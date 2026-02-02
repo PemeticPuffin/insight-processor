@@ -42,12 +42,13 @@ def remove_numbering(paragraph):
         paragraph: The paragraph to remove numbering from
     """
     p_element = paragraph._element
-    # Find and remove numPr (numbering properties) element
-    numPr = p_element.find(qn('w:pPr'))
-    if numPr is not None:
-        num_element = numPr.find(qn('w:numPr'))
+    # Find the paragraph properties element
+    pPr = p_element.find(qn('w:pPr'))
+    if pPr is not None:
+        # Remove numPr (numbering properties) if present
+        num_element = pPr.find(qn('w:numPr'))
         if num_element is not None:
-            numPr.remove(num_element)
+            pPr.remove(num_element)
 
 
 def apply_bullet_style(paragraph):
@@ -55,15 +56,21 @@ def apply_bullet_style(paragraph):
     Apply bullet point style to a paragraph.
 
     Removes any existing numbering and uses the 'List Bullet' style
-    to ensure dot bullets.
+    to ensure dot bullets. Removes numbering both before and after
+    applying the style to handle cases where the style adds numbering.
 
     Args:
         paragraph: The paragraph to convert to a bullet
     """
-    # First, remove any existing numbering properties that would override the style
+    # First, remove any existing numbering properties
     remove_numbering(paragraph)
+
     # Apply the List Bullet style
     paragraph.style = 'List Bullet'
+
+    # Remove numbering again - applying a style can re-add numPr
+    # (especially for the first item in a list sequence)
+    remove_numbering(paragraph)
 
 
 def is_intro_line(text: str, is_first_in_section: bool = False) -> bool:
