@@ -70,6 +70,15 @@ ROLE_ABBREVIATIONS = {
 FONT_NAME = "Calibri"
 FONT_SIZE_PT = 11
 
+# EP email hyperlink tag (appended to all hyperlinks in generated EP emails)
+EP_URL_SUFFIX = "?ref=salesenablementnewsletter&"
+
+# AskGartner prompt hyperlink base URL
+ASKGARTNER_BASE_URL = "https://www.gartner.com/askgartner/q="
+
+# AskGartner section header name (used to identify the section for hyperlink conversion)
+ASKGARTNER_HEADER = "AskGartner Prompts to Recommend"
+
 # Email template heading patterns
 EMAIL_HEADING_PATTERNS = {
     "BD": ["SALES BUSINESS DEVELOPER", "PROSPECT EMAIL"],

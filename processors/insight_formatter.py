@@ -17,11 +17,12 @@ from typing import Tuple, List, Set
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import HEADERS_TO_BOLD, BULLET_SECTION_HEADERS
+from config import HEADERS_TO_BOLD, BULLET_SECTION_HEADERS, ASKGARTNER_HEADER, ASKGARTNER_BASE_URL
 from utils.formatting_utils import (
     set_font_calibri_11pt,
     bold_paragraph,
     apply_bullet_style,
+    apply_bullet_with_hyperlink,
     is_intro_line,
     add_spacing_after,
     is_numbered_or_dashed_list,
@@ -86,6 +87,34 @@ def get_section_ranges(doc: Document) -> List[Tuple[int, int, int]]:
     return ranges
 
 
+def get_askgartner_indices(doc: Document) -> Set[int]:
+    """
+    Identify paragraph indices that belong to the AskGartner section.
+
+    Args:
+        doc: The Document to analyze
+
+    Returns:
+        Set of paragraph indices within the AskGartner section
+    """
+    indices = set()
+    in_askgartner = False
+
+    for idx, para in enumerate(doc.paragraphs):
+        text = para.text.strip()
+        if text == ASKGARTNER_HEADER:
+            in_askgartner = True
+            continue
+        elif text in HEADERS_TO_BOLD:
+            in_askgartner = False
+            continue
+
+        if in_askgartner:
+            indices.add(idx)
+
+    return indices
+
+
 def find_title_paragraph(doc: Document) -> int:
     """
     Find the paragraph index of "Title of Insight" or similar title line.
@@ -128,6 +157,9 @@ def format_single_document(file_path: Path) -> Tuple[bool, str]:
             if first_content_idx >= 0:
                 first_in_section.add(first_content_idx)
 
+        # Identify AskGartner section paragraphs for hyperlink conversion
+        askgartner_indices = get_askgartner_indices(doc)
+
         # Find title paragraph for spacing
         title_idx = find_title_paragraph(doc)
 
@@ -151,8 +183,11 @@ def format_single_document(file_path: Path) -> Tuple[bool, str]:
                 if is_intro_line(para.text, is_first_in_section=is_first):
                     continue
 
+                # AskGartner prompts: bullet + hyperlink
+                if idx in askgartner_indices:
+                    apply_bullet_with_hyperlink(para, ASKGARTNER_BASE_URL, doc)
                 # Check if it's a numbered or dashed list that needs conversion
-                if is_numbered_or_dashed_list(para):
+                elif is_numbered_or_dashed_list(para):
                     convert_to_dot_bullet(para)
                 else:
                     # Apply bullet style to non-empty paragraphs

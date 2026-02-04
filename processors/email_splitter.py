@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple, Any, Optional
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import FONT_NAME, FONT_SIZE_PT
+from config import FONT_NAME, FONT_SIZE_PT, EP_URL_SUFFIX
 from utils.date_utils import get_two_mondays_from_now, format_date_for_filename
 from utils.text_utils import get_role_abbreviation
 from utils.folder_utils import find_matching_subfolder
@@ -38,7 +38,7 @@ def apply_font_formatting(doc: Document):
             run.font.size = Pt(FONT_SIZE_PT)
 
 
-def copy_paragraph_with_formatting(source_para, target_doc, source_doc=None) -> Any:
+def copy_paragraph_with_formatting(source_para, target_doc, source_doc=None, url_suffix=None) -> Any:
     """
     Copy a paragraph with all its formatting to target document.
 
@@ -48,6 +48,7 @@ def copy_paragraph_with_formatting(source_para, target_doc, source_doc=None) -> 
         source_para: The source paragraph
         target_doc: The target Document object
         source_doc: The source Document object (needed for hyperlink relationships)
+        url_suffix: Optional string to append to all hyperlink URLs (e.g., tracking tag)
 
     Returns:
         The new paragraph in the target document
@@ -94,9 +95,13 @@ def copy_paragraph_with_formatting(source_para, target_doc, source_doc=None) -> 
                     source_part = source_doc.part
                     rel = source_part.rels.get(r_id)
                     if rel and rel.target_ref:
+                        # Append URL suffix if provided (e.g., tracking tag)
+                        target_url = rel.target_ref
+                        if url_suffix:
+                            target_url = target_url + url_suffix
                         # Add new relationship in target document
                         new_rel = target_doc.part.relate_to(
-                            rel.target_ref,
+                            target_url,
                             'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
                             is_external=True
                         )
@@ -173,7 +178,8 @@ def parse_email_document(doc_path: Path) -> Tuple[Dict[str, Dict[str, Any]], Doc
 def create_email_document(
     heading_paras: List[Any],
     content_paras_list: List[List[Any]],
-    source_doc: Document = None
+    source_doc: Document = None,
+    url_suffix: str = None
 ) -> Document:
     """
     Create a new Word document with headings and content.
@@ -182,6 +188,7 @@ def create_email_document(
         heading_paras: List of heading paragraphs
         content_paras_list: List of lists of content paragraphs
         source_doc: Source Document object (needed for hyperlink relationships)
+        url_suffix: Optional string to append to all hyperlink URLs
 
     Returns:
         New Document with the combined content
@@ -191,11 +198,11 @@ def create_email_document(
     for heading_para, content_paras in zip(heading_paras, content_paras_list):
         # Add heading
         if heading_para:
-            copy_paragraph_with_formatting(heading_para, doc, source_doc)
+            copy_paragraph_with_formatting(heading_para, doc, source_doc, url_suffix=url_suffix)
 
         # Add content
         for para in content_paras:
-            copy_paragraph_with_formatting(para, doc, source_doc)
+            copy_paragraph_with_formatting(para, doc, source_doc, url_suffix=url_suffix)
 
     # Apply Calibri 11pt formatting
     apply_font_formatting(doc)
@@ -273,7 +280,8 @@ def split_emails(
             ep_doc = create_email_document(
                 [templates['EP']['heading']],
                 [templates['EP']['content']],
-                source_doc
+                source_doc,
+                url_suffix=EP_URL_SUFFIX
             )
             ep_filename = f"{date_prefix}_{role}_EP_email.docx"
             ep_path = subfolder / ep_filename
