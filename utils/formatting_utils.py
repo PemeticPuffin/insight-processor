@@ -155,8 +155,8 @@ def apply_bullet_with_hyperlink(paragraph, base_url, doc):
     # Extract clean text (strip bullets, list markers, etc.)
     text = _extract_clean_text(paragraph.text)
 
-    # Build URL: base_url + text with spaces as %20
-    url = base_url + text.replace(' ', '%20')
+    # Build URL: base_url + text with special characters encoded
+    url = base_url + text.replace('&', '%26').replace(' ', '%20')
 
     # Clear all list formatting
     clear_all_list_formatting(paragraph)

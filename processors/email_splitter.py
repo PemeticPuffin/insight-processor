@@ -24,6 +24,53 @@ from utils.folder_utils import find_matching_subfolder
 # XML namespace for relationships
 HYPERLINK_TAG = qn('w:hyperlink')
 
+# Lines that should be converted to Heading 3 before splitting
+HEADING3_MARKERS = [
+    "SALES BUSINESS DEVELOPER - PROSPECT EMAIL TEMPLATE",
+    "SALES ACCOUNT EXECUTIVE - CLIENT EMAIL TEMPLATE",
+    "SERVICE EXECUTIVE PARTNER - CLIENT EMAIL TEMPLATE",
+]
+
+
+def apply_heading3_markers(doc_path: Path, progress_callback=None) -> bool:
+    """
+    Open the email templates document and convert specific lines to Heading 3.
+
+    This is a pre-processing step that ensures the email type markers are
+    formatted as Heading 3 so the subsequent splitting logic can detect them.
+
+    Args:
+        doc_path: Path to the email templates document
+        progress_callback: Optional callback function(message: str)
+
+    Returns:
+        True if any headings were applied and the file was saved
+    """
+    def log(msg):
+        if progress_callback:
+            progress_callback(msg)
+        else:
+            print(msg)
+
+    doc = Document(doc_path)
+    changes_made = 0
+
+    for para in doc.paragraphs:
+        text = para.text.strip().upper()
+        if text in [m.upper() for m in HEADING3_MARKERS]:
+            if para.style.name != 'Heading 3':
+                para.style = doc.styles['Heading 3']
+                changes_made += 1
+                log(f"Applied Heading 3 to: {para.text.strip()}")
+
+    if changes_made > 0:
+        doc.save(str(doc_path))
+        log(f"Saved {changes_made} Heading 3 change(s) to {doc_path.name}")
+    else:
+        log("All email type markers already formatted as Heading 3")
+
+    return changes_made > 0
+
 
 def apply_font_formatting(doc: Document):
     """
@@ -231,6 +278,10 @@ def split_emails(
             progress_callback(msg)
         else:
             print(msg)
+
+    # Pre-processing: ensure email type markers are Heading 3
+    log("Pre-processing: applying Heading 3 to email type markers...")
+    apply_heading3_markers(source_doc_path, progress_callback=progress_callback)
 
     log(f"Reading source document: {source_doc_path.name}")
     sections, source_doc = parse_email_document(source_doc_path)
