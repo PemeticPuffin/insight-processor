@@ -23,7 +23,6 @@ from utils.formatting_utils import (
     bold_paragraph,
     apply_bullet_style,
     apply_bullet_with_hyperlink,
-    is_intro_line,
     add_spacing_after,
     is_numbered_or_dashed_list,
     convert_to_dot_bullet,
@@ -150,12 +149,8 @@ def format_single_document(file_path: Path) -> Tuple[bool, str]:
 
         # Create a set of paragraph indices that should be bulleted
         bullet_indices: Set[int] = set()
-        # Track which indices are the first content paragraph in their section
-        first_in_section: Set[int] = set()
-        for start, end, first_content_idx in bullet_ranges:
+        for start, end, _ in bullet_ranges:
             bullet_indices.update(range(start, end))
-            if first_content_idx >= 0:
-                first_in_section.add(first_content_idx)
 
         # Identify AskGartner section paragraphs for hyperlink conversion
         askgartner_indices = get_askgartner_indices(doc)
@@ -178,11 +173,6 @@ def format_single_document(file_path: Path) -> Tuple[bool, str]:
 
             # Handle bullet sections
             elif idx in bullet_indices and para.text.strip():
-                # Check if this is an intro line that should NOT be bulleted
-                is_first = idx in first_in_section
-                if is_intro_line(para.text, is_first_in_section=is_first):
-                    continue
-
                 # AskGartner prompts: bullet + hyperlink
                 if idx in askgartner_indices:
                     apply_bullet_with_hyperlink(para, ASKGARTNER_BASE_URL, doc)
