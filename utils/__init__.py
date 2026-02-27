@@ -11,7 +11,6 @@ from .formatting_utils import (
     set_font_calibri_11pt,
     bold_paragraph,
     apply_bullet_style,
-    is_intro_line,
     add_spacing_after,
 )
 
@@ -31,6 +30,5 @@ __all__ = [
     "set_font_calibri_11pt",
     "bold_paragraph",
     "apply_bullet_style",
-    "is_intro_line",
     "add_spacing_after",
 ]

@@ -3,6 +3,7 @@ Text utility functions for filename sanitization and role abbreviations.
 """
 
 import re
+from typing import Optional
 from config import ROLE_ABBREVIATIONS, ROLE_FOLDER_DEFINITIONS
 
 
@@ -59,7 +60,7 @@ def get_role_abbreviation(heading: str) -> str:
     heading_lower = heading.strip().lower()
 
     # First check role folder definitions (case-insensitive)
-    for create_name, synonyms in ROLE_FOLDER_DEFINITIONS:
+    for create_name, _, synonyms in ROLE_FOLDER_DEFINITIONS:
         for synonym in synonyms:
             if synonym.lower() == heading_lower:
                 return create_name
@@ -70,3 +71,23 @@ def get_role_abbreviation(heading: str) -> str:
 
     # Return sanitized version of the heading if no mapping
     return sanitize_for_filename(heading)
+
+
+def get_role_full_name(role_name: str) -> Optional[str]:
+    """
+    Get the full display name for a role.
+
+    Args:
+        role_name: Any synonym or canonical name for the role (e.g., "CAE", "Chief Audit Executive")
+
+    Returns:
+        The full name (e.g., "Chief Audit Executive") or None if not found
+    """
+    role_lower = role_name.strip().lower()
+
+    for _, full_name, synonyms in ROLE_FOLDER_DEFINITIONS:
+        for synonym in synonyms:
+            if synonym.lower() == role_lower:
+                return full_name
+
+    return None

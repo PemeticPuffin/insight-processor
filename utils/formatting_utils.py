@@ -68,20 +68,16 @@ def apply_bullet_style(paragraph):
     """
     Apply bullet point formatting to a paragraph.
 
-    Uses a completely fresh approach to avoid any residual list formatting:
-    1. Extracts the plain text
-    2. Clears ALL paragraph content and formatting
-    3. Rebuilds with bullet character and clean formatting
+    Extracts clean text (stripping any existing bullet chars, numbers, or dashes),
+    clears all paragraph content and list formatting, then rebuilds with a dot bullet.
 
     Args:
         paragraph: The paragraph to convert to a bullet
     """
-    # Get the plain text content (strip any existing bullet chars)
-    text = paragraph.text
-    if text.startswith(BULLET_CHAR):
-        text = text[1:].lstrip('\t ')
+    # Extract clean text (strips bullet chars, numbered markers, dashes)
+    text = _extract_clean_text(paragraph.text)
 
-    # Aggressively clear all list formatting
+    # Clear all list formatting
     clear_all_list_formatting(paragraph)
 
     # Set to Normal style
@@ -90,16 +86,13 @@ def apply_bullet_style(paragraph):
     # Clear again after style change (style can re-add formatting)
     clear_all_list_formatting(paragraph)
 
-    # Now completely clear and rebuild the paragraph content
+    # Rebuild the paragraph content
     paragraph.clear()
 
     # Add fresh run with bullet character, tab, and text
-    run = paragraph.add_run(BULLET_CHAR + '\t' + text.strip())
+    run = paragraph.add_run(BULLET_CHAR + '\t' + text)
     run.font.name = FONT_NAME
     run.font.size = Pt(FONT_SIZE_PT)
-
-    # Clear any list formatting one more time (to be absolutely sure)
-    clear_all_list_formatting(paragraph)
 
     # Set indentation for bullet appearance
     paragraph.paragraph_format.left_indent = Inches(0.5)
@@ -224,76 +217,18 @@ def apply_bullet_with_hyperlink(paragraph, base_url, doc):
     paragraph.paragraph_format.first_line_indent = Inches(-0.25)
 
 
-def is_intro_line(text: str, is_first_in_section: bool = False) -> bool:
+def replace_cxo_in_document(doc, full_name: str):
     """
-    Detect if a line is an intro line that should not be bulleted.
-
-    Intro lines are detected by:
-    - Ending with a colon (:)
-    - Being a section intro phrase (e.g., "Here are", "The following")
-    - Being the first line of a section AND being a complete sentence
-    - Being a full sentence with explanatory context (contains "you/your")
+    Replace all occurrences of 'CXO' with the role's full name in every run.
 
     Args:
-        text: The text to check
-        is_first_in_section: True if this is the first non-empty paragraph after a section header
-
-    Returns:
-        True if this appears to be an intro line
+        doc: The Document object to modify in place
+        full_name: The full role name to substitute (e.g., "Chief Information Officer")
     """
-    text = text.strip()
-
-    if not text:
-        return False
-
-    # Check if ends with colon (intro phrase)
-    if text.endswith(':'):
-        return True
-
-    # Check for common intro patterns
-    intro_patterns = [
-        r'^Here\s+(are|is)\b',
-        r'^The\s+following\b',
-        r'^Consider\s+the\s+following\b',
-        r'^Below\s+(are|is)\b',
-        r'^This\s+includes?\b',
-    ]
-
-    for pattern in intro_patterns:
-        if re.match(pattern, text, re.IGNORECASE):
-            return True
-
-    # Check if it's a full sentence ending with a period
-    if text.endswith('.'):
-        words = text.split()
-
-        # If this is the first line in a section and it's a complete sentence,
-        # treat it as an intro line (these are typically context-setting sentences)
-        if is_first_in_section and len(words) >= 4:
-            # Check if it doesn't look like a bullet point (doesn't start with action verbs)
-            action_verbs = ['use', 'apply', 'create', 'develop', 'implement',
-                          'analyze', 'review', 'ensure', 'provide', 'manage',
-                          'identify', 'define', 'establish', 'build', 'leverage',
-                          'drive', 'enable', 'support', 'deliver', 'achieve']
-            first_word = words[0].lower().rstrip('.,;:')
-            if first_word not in action_verbs:
-                return True
-
-        # Full sentences typically have at least 5 words and don't start with action verbs
-        # commonly used in bullet points
-        if len(words) >= 5:
-            # Check if it doesn't start with typical bullet-point action verbs
-            action_verbs = ['use', 'apply', 'create', 'develop', 'implement',
-                          'analyze', 'review', 'ensure', 'provide', 'manage',
-                          'identify', 'define', 'establish', 'build', 'leverage',
-                          'drive', 'enable', 'support', 'deliver', 'achieve']
-            first_word = words[0].lower().rstrip('.,;:')
-            if first_word not in action_verbs:
-                # Additional check: if it contains "you" or "your" in an explanatory context
-                if 'you' in text.lower() or 'your' in text.lower():
-                    return True
-
-    return False
+    for para in doc.paragraphs:
+        for run in para.runs:
+            if 'CXO' in run.text:
+                run.text = run.text.replace('CXO', full_name)
 
 
 def add_spacing_after(paragraph, points: int = 12):
@@ -307,112 +242,3 @@ def add_spacing_after(paragraph, points: int = 12):
     paragraph.paragraph_format.space_after = Pt(points)
 
 
-def has_word_numbering(paragraph) -> bool:
-    """
-    Check if a paragraph has Word-level automatic numbering (numPr in XML).
-
-    This detects numbering that's applied through Word's list feature,
-    which doesn't appear in the paragraph text but renders as numbers.
-
-    Args:
-        paragraph: The paragraph to check
-
-    Returns:
-        True if the paragraph has Word-level numbering
-    """
-    p_element = paragraph._element
-    pPr = p_element.find(qn('w:pPr'))
-    if pPr is not None:
-        numPr = pPr.find(qn('w:numPr'))
-        if numPr is not None:
-            return True
-    return False
-
-
-def is_numbered_or_dashed_list(paragraph) -> bool:
-    """
-    Check if a paragraph is a numbered list or uses dashes as bullets.
-
-    Checks both:
-    1. Text-level patterns (e.g., "1. Item" as literal text)
-    2. Word-level numbering (numPr in XML, renders as numbers but not in text)
-
-    Args:
-        paragraph: The paragraph to check
-
-    Returns:
-        True if the paragraph uses numbers or dashes as list markers
-    """
-    # First check for Word-level automatic numbering
-    if has_word_numbering(paragraph):
-        return True
-
-    text = paragraph.text.strip()
-
-    if not text:
-        return False
-
-    # Check for numbered list patterns (1. or 1) or a. or a))
-    numbered_patterns = [
-        r'^\d+[\.\)]\s',      # 1. or 1)
-        r'^[a-zA-Z][\.\)]\s',  # a. or a)
-        r'^\(\d+\)\s',         # (1)
-        r'^\([a-zA-Z]\)\s',    # (a)
-    ]
-
-    for pattern in numbered_patterns:
-        if re.match(pattern, text):
-            return True
-
-    # Check for dash/hyphen bullet
-    if text.startswith('- ') or text.startswith('– ') or text.startswith('— '):
-        return True
-
-    return False
-
-
-def convert_to_dot_bullet(paragraph):
-    """
-    Convert a numbered or dashed list item to a dot bullet.
-
-    Removes the existing marker and applies bullet style.
-    Preserves bold formatting if present.
-
-    Args:
-        paragraph: The paragraph to convert
-    """
-    text = paragraph.text.strip()
-
-    # Preserve bold state before clearing
-    is_bold = False
-    if paragraph.runs:
-        is_bold = paragraph.runs[0].bold
-
-    # Remove numbered list markers
-    numbered_patterns = [
-        r'^\d+[\.\)]\s*',
-        r'^[a-zA-Z][\.\)]\s*',
-        r'^\(\d+\)\s*',
-        r'^\([a-zA-Z]\)\s*',
-    ]
-
-    for pattern in numbered_patterns:
-        text = re.sub(pattern, '', text)
-
-    # Remove dash/hyphen markers
-    if text.startswith('- '):
-        text = text[2:]
-    elif text.startswith('– ') or text.startswith('— '):
-        text = text[2:]
-
-    # Clear and set clean text (apply_bullet_style will rebuild)
-    paragraph.clear()
-    paragraph.add_run(text.strip())
-
-    # Apply bullet style (this will clear and rebuild with bullet char)
-    apply_bullet_style(paragraph)
-
-    # Re-apply bold if it was set
-    if is_bold and paragraph.runs:
-        for run in paragraph.runs:
-            run.bold = True

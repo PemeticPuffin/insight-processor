@@ -8,7 +8,6 @@ These tests challenge formatting functions with:
 - Font and style preservation
 """
 
-import pytest
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -21,10 +20,8 @@ from utils.formatting_utils import (
     set_font_calibri_11pt,
     bold_paragraph,
     apply_bullet_style,
-    is_intro_line,
     add_spacing_after,
-    is_numbered_or_dashed_list,
-    convert_to_dot_bullet,
+    replace_cxo_in_document,
 )
 from config import FONT_NAME, FONT_SIZE_PT
 
@@ -216,124 +213,6 @@ class TestApplyBulletStyle:
         assert para.text.startswith('\u2022')  # •
 
 
-class TestIsIntroLine:
-    """Tests for is_intro_line function."""
-
-    # Lines ending with colon should be intro lines
-    @pytest.mark.parametrize("text", [
-        "Key points:",
-        "Consider the following:",
-        "Important items:",
-        "Requirements:",
-        "Steps to take:",
-    ])
-    def test_colon_ending_is_intro(self, text):
-        """Test that lines ending with colon are detected as intro."""
-        assert is_intro_line(text) == True
-
-    # Common intro patterns
-    @pytest.mark.parametrize("text", [
-        "Here are the key points",
-        "Here is the summary",
-        "The following items are important",
-        "Consider the following approach",
-        "Below are the recommendations",
-        "Below is the data",
-        "This includes several items",
-    ])
-    def test_common_intro_patterns(self, text):
-        """Test common intro phrase patterns."""
-        assert is_intro_line(text) == True
-
-    # Lines that should NOT be intro lines
-    @pytest.mark.parametrize("text", [
-        "Use proper security measures.",
-        "Apply the new policy.",
-        "Create a backup before proceeding.",
-        "Develop a comprehensive strategy.",
-        "Implement the solution.",
-        "Analyze the results.",
-        "Review the documentation.",
-        "Ensure compliance.",
-        "Provide regular updates.",
-        "Manage resources effectively.",
-    ])
-    def test_action_verb_lines_not_intro(self, text):
-        """Test that lines starting with action verbs are not intro."""
-        assert is_intro_line(text) == False
-
-    # Full sentences with explanatory content
-    @pytest.mark.parametrize("text", [
-        "This is a detailed explanation of what you need to do for your project.",
-        "When you review your options, consider the long-term implications.",
-        "If your team needs guidance, refer to the documentation.",
-    ])
-    def test_full_sentence_with_you_is_intro(self, text):
-        """Test that explanatory sentences with 'you/your' are intro."""
-        assert is_intro_line(text) == True
-
-    # Short lines
-    @pytest.mark.parametrize("text", [
-        "Short.",
-        "Two words.",
-        "Three word line.",
-    ])
-    def test_short_lines_not_intro(self, text):
-        """Test that short lines (< 5 words) are not intro."""
-        assert is_intro_line(text) == False
-
-    # Edge cases
-    def test_empty_string(self):
-        """Test with empty string."""
-        assert is_intro_line("") == False
-
-    def test_whitespace_only(self):
-        """Test with whitespace only."""
-        assert is_intro_line("   ") == False
-
-    def test_single_colon(self):
-        """Test string that is just a colon."""
-        assert is_intro_line(":") == True
-
-    def test_case_insensitivity(self):
-        """Test that pattern matching is case-insensitive."""
-        assert is_intro_line("HERE ARE THE POINTS") == True
-        assert is_intro_line("here are the points") == True
-        assert is_intro_line("Here Are The Points") == True
-
-    def test_colon_in_middle_not_intro(self):
-        """Test that colon in middle of sentence doesn't make it intro."""
-        text = "Step 1: Execute the plan."
-        # Ends with period, has colon in middle
-        # This is tricky - depends on full logic
-        result = is_intro_line(text)
-        # May or may not be intro depending on word count and patterns
-
-    def test_bullet_point_content(self):
-        """Test typical bullet point content."""
-        bullets = [
-            "Reduce costs by 20%",
-            "Improve efficiency",
-            "Streamline processes",
-            "Eliminate redundancy",
-        ]
-
-        for bullet in bullets:
-            assert is_intro_line(bullet) == False
-
-    # Real-world examples from the application
-    @pytest.mark.parametrize("text,expected", [
-        ("Why this matters to you:", True),
-        ("Key takeaways:", True),
-        ("Here are three reasons why this is important.", True),
-        ("Use this insight to drive conversations.", False),
-        ("Apply these principles in your discussions.", False),
-    ])
-    def test_real_world_examples(self, text, expected):
-        """Test with real-world examples."""
-        assert is_intro_line(text) == expected
-
-
 class TestAddSpacingAfter:
     """Tests for add_spacing_after function."""
 
@@ -374,191 +253,6 @@ class TestAddSpacingAfter:
         assert para.paragraph_format.space_after == Pt(72)
 
 
-class TestIsNumberedOrDashedList:
-    """Tests for is_numbered_or_dashed_list function."""
-
-    # Numbered list patterns
-    @pytest.mark.parametrize("text", [
-        "1. First item",
-        "2. Second item",
-        "10. Tenth item",
-        "100. Hundredth item",
-        "1) First item",
-        "2) Second item",
-        "(1) First item",
-        "(2) Second item",
-    ])
-    def test_numbered_patterns(self, text):
-        """Test various numbered list patterns."""
-        doc = Document()
-        para = doc.add_paragraph(text)
-
-        assert is_numbered_or_dashed_list(para) == True
-
-    # Letter list patterns
-    @pytest.mark.parametrize("text", [
-        "a. First item",
-        "b. Second item",
-        "z. Last item",
-        "A. First item",
-        "B. Second item",
-        "a) First item",
-        "A) First item",
-        "(a) First item",
-        "(A) First item",
-    ])
-    def test_letter_patterns(self, text):
-        """Test various letter list patterns."""
-        doc = Document()
-        para = doc.add_paragraph(text)
-
-        assert is_numbered_or_dashed_list(para) == True
-
-    # Dash patterns
-    @pytest.mark.parametrize("text", [
-        "- First item",
-        "- Second item",
-        "\u2013 En dash item",  # en-dash
-        "\u2014 Em dash item",  # em-dash
-    ])
-    def test_dash_patterns(self, text):
-        """Test dash list patterns."""
-        doc = Document()
-        para = doc.add_paragraph(text)
-
-        assert is_numbered_or_dashed_list(para) == True
-
-    # Non-list patterns
-    @pytest.mark.parametrize("text", [
-        "Regular paragraph text",
-        "This is a sentence.",
-        "No list marker here",
-        "1234 This starts with number but no marker",
-        "a sentence starting with a",
-        "-continued line",  # No space after dash
-        "* Asterisk item",  # Not a dash
-    ])
-    def test_non_list_patterns(self, text):
-        """Test text that should NOT be detected as list."""
-        doc = Document()
-        para = doc.add_paragraph(text)
-
-        assert is_numbered_or_dashed_list(para) == False
-
-    def test_empty_paragraph(self, temp_dir):
-        """Test with empty paragraph."""
-        doc = Document()
-        para = doc.add_paragraph("")
-
-        assert is_numbered_or_dashed_list(para) == False
-
-    def test_whitespace_only(self, temp_dir):
-        """Test with whitespace only."""
-        doc = Document()
-        para = doc.add_paragraph("   ")
-
-        assert is_numbered_or_dashed_list(para) == False
-
-
-class TestConvertToDotBullet:
-    """Tests for convert_to_dot_bullet function."""
-
-    def test_converts_numbered_to_bullet(self, temp_dir):
-        """Test converting numbered list to bullet."""
-        doc = Document()
-        para = doc.add_paragraph("1. First item")
-
-        convert_to_dot_bullet(para)
-
-        assert para.style.name == "Normal"
-        assert "1." not in para.text
-        assert para.text.startswith('\u2022')  # •
-
-    def test_converts_dash_to_bullet(self, temp_dir):
-        """Test converting dash list to bullet."""
-        doc = Document()
-        para = doc.add_paragraph("- Dash item")
-
-        convert_to_dot_bullet(para)
-
-        assert para.style.name == "Normal"
-        assert "Dash item" in para.text
-        assert para.text.startswith('\u2022')  # •
-
-    def test_converts_letter_to_bullet(self, temp_dir):
-        """Test converting letter list to bullet."""
-        doc = Document()
-        para = doc.add_paragraph("a. Letter item")
-
-        convert_to_dot_bullet(para)
-
-        assert para.style.name == "Normal"
-        assert "a." not in para.text
-        assert para.text.startswith('\u2022')  # •
-
-    def test_preserves_font_name(self, temp_dir):
-        """Test that font name is preserved."""
-        doc = Document()
-        para = doc.add_paragraph()
-        run = para.add_run("1. Item with font")
-        run.font.name = "Arial"
-
-        convert_to_dot_bullet(para)
-
-        # Font should be preserved or defaulted to config
-        assert para.runs[0].font.name in ["Arial", FONT_NAME]
-
-    def test_preserves_bold(self, temp_dir):
-        """Test that bold formatting is preserved."""
-        doc = Document()
-        para = doc.add_paragraph()
-        run = para.add_run("1. Bold item")
-        run.bold = True
-
-        convert_to_dot_bullet(para)
-
-        assert para.runs[0].bold == True
-
-    def test_en_dash_removal(self, temp_dir):
-        """Test en-dash is removed."""
-        doc = Document()
-        para = doc.add_paragraph("\u2013 En dash item")
-
-        convert_to_dot_bullet(para)
-
-        assert "\u2013" not in para.text
-
-    def test_em_dash_removal(self, temp_dir):
-        """Test em-dash is removed."""
-        doc = Document()
-        para = doc.add_paragraph("\u2014 Em dash item")
-
-        convert_to_dot_bullet(para)
-
-        assert "\u2014" not in para.text
-
-    def test_parenthetical_number_removal(self, temp_dir):
-        """Test (1) format is removed."""
-        doc = Document()
-        para = doc.add_paragraph("(1) Parenthetical item")
-
-        convert_to_dot_bullet(para)
-
-        assert "(1)" not in para.text
-
-    def test_paragraph_with_no_runs(self, temp_dir):
-        """Test conversion on paragraph with no runs."""
-        doc = Document()
-        para = doc.add_paragraph()
-        # Manually add text without creating a run via add_run
-        # This is unusual but should be handled
-
-        # This is actually tricky to create - add_paragraph creates a run
-        # So we'll just test that it doesn't crash on empty text
-        para2 = doc.add_paragraph("")
-        convert_to_dot_bullet(para2)
-
-
 class TestFormattingUtilsIntegration:
     """Integration tests for formatting utilities."""
 
@@ -567,11 +261,8 @@ class TestFormattingUtilsIntegration:
         doc = Document()
         para = doc.add_paragraph("1. Important point")
 
-        # Set font
         set_font_calibri_11pt(para)
-
-        # Convert to bullet
-        convert_to_dot_bullet(para)
+        apply_bullet_style(para)
 
         assert para.style.name == "Normal"
         assert para.text.startswith('\u2022')  # •
@@ -586,40 +277,90 @@ class TestFormattingUtilsIntegration:
 
         content = doc.add_paragraph("- Key insight point")
         set_font_calibri_11pt(content)
-        convert_to_dot_bullet(content)
+        apply_bullet_style(content)
 
         assert header.runs[0].bold == True
         assert content.style.name == "Normal"
         assert content.text.startswith('\u2022')  # •
 
-    def test_detect_and_convert_list(self, temp_dir):
-        """Test detecting list and converting it."""
+
+class TestReplaceCxoInDocument:
+    """Tests for replace_cxo_in_document function."""
+
+    def test_replaces_cxo_in_single_run(self):
+        """Test basic CXO replacement in a single run."""
         doc = Document()
-        para = doc.add_paragraph("1. First point")
+        para = doc.add_paragraph()
+        para.add_run("Hello CXO, welcome.")
 
-        if is_numbered_or_dashed_list(para):
-            convert_to_dot_bullet(para)
+        replace_cxo_in_document(doc, "Chief Information Officer")
 
-        assert para.style.name == "Normal"
-        assert para.text.startswith('\u2022')  # •
+        assert "CXO" not in para.text
+        assert "Chief Information Officer" in para.text
 
-    def test_skip_intro_apply_bullet_to_content(self, temp_dir):
-        """Test skipping intro line and bulleting content."""
+    def test_replaces_cxo_in_multiple_paragraphs(self):
+        """Test replacement across multiple paragraphs."""
         doc = Document()
+        doc.add_paragraph().add_run("Dear CXO")
+        doc.add_paragraph().add_run("As a CXO, you should know")
+        doc.add_paragraph().add_run("No placeholder here")
 
-        intro = doc.add_paragraph("Key points to consider:")
-        content1 = doc.add_paragraph("First important point")
-        content2 = doc.add_paragraph("Second important point")
+        replace_cxo_in_document(doc, "Chief Financial Officer")
 
-        paragraphs = [intro, content1, content2]
+        for para in doc.paragraphs:
+            assert "CXO" not in para.text
 
-        for para in paragraphs:
-            text = para.text
-            if not is_intro_line(text):
-                apply_bullet_style(para)
+        assert "Chief Financial Officer" in doc.paragraphs[0].text
+        assert "Chief Financial Officer" in doc.paragraphs[1].text
+        assert "No placeholder here" == doc.paragraphs[2].text
 
-        # Intro should not be bulleted (no bullet char)
-        assert not intro.text.startswith('\u2022')
-        # Content should be bulleted
-        assert content1.text.startswith('\u2022')  # •
-        assert content2.text.startswith('\u2022')  # •
+    def test_replaces_multiple_cxo_in_one_run(self):
+        """Test replacement of multiple CXO occurrences in one run."""
+        doc = Document()
+        para = doc.add_paragraph()
+        para.add_run("CXO and CXO agenda")
+
+        replace_cxo_in_document(doc, "Chief Marketing Officer")
+
+        assert "CXO" not in para.text
+        assert para.text.count("Chief Marketing Officer") == 2
+
+    def test_no_cxo_no_change(self):
+        """Test that documents without CXO are unaffected."""
+        doc = Document()
+        para = doc.add_paragraph()
+        para.add_run("Regular content with no placeholder")
+
+        replace_cxo_in_document(doc, "Chief Audit Executive")
+
+        assert para.text == "Regular content with no placeholder"
+
+    def test_preserves_run_formatting(self):
+        """Test that bold/italic formatting on the run is preserved after replacement."""
+        doc = Document()
+        para = doc.add_paragraph()
+        run = para.add_run("Attention CXO")
+        run.bold = True
+
+        replace_cxo_in_document(doc, "General Counsel")
+
+        assert para.runs[0].bold == True
+        assert "General Counsel" in para.text
+
+    def test_case_sensitive_no_replace_lowercase(self):
+        """Test that lowercase 'cxo' is not replaced (placeholder is always uppercase)."""
+        doc = Document()
+        para = doc.add_paragraph()
+        para.add_run("cxo should not change")
+
+        replace_cxo_in_document(doc, "Chief Information Officer")
+
+        assert para.text == "cxo should not change"
+
+    def test_empty_document(self):
+        """Test with a document that has no paragraphs with text."""
+        doc = Document()
+        doc.add_paragraph()  # empty paragraph
+
+        # Should not raise
+        replace_cxo_in_document(doc, "Chief Information Officer")

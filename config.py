@@ -26,29 +26,30 @@ BULLET_SECTION_HEADERS = [
     "Key Terms",
 ]
 
-# Role folder definitions: (create_name, [all_synonyms])
+# Role folder definitions: (create_name, full_name, [all_synonyms])
 # - create_name: the folder name to create if none exists
+# - full_name: the full display name used for CXO replacement
 # - all_synonyms: all variations of the role name (for input matching AND folder searching)
 # Matching is case-insensitive and exact (not substring)
 ROLE_FOLDER_DEFINITIONS = [
-    ("CIO", ["CIO"]),
-    ("TCMO", ["Tech CMO", "TCMO"]),
-    ("CHRO", ["CHRO"]),
-    ("CSCO", ["CSCO"]),
-    ("CMO", ["CMO"]),
-    ("CS", ["Customer Service", "CS"]),
-    ("RD", ["R&D", "RND", "RD"]),
-    ("CAE", ["Chief Audit Executive", "CAE"]),
-    ("AIL", ["AI Leader", "AIL"]),
-    ("CDAO", ["CDAO"]),
-    ("CSO", ["CSO"]),
-    ("TCEO", ["Tech CEO", "TCEO"]),
-    ("CPO GBS", ["CPO - Procurement (GBS)", "CPO - Procurement", "CPO - GBS", "CPO (GBS)", "CPO GBS"]),
-    ("CPO HT", ["CPO - Product (HT)", "CPO - Product", "CPO - HT", "CPO (HT)", "CPO HT"]),
-    ("CFO", ["CFO"]),
-    ("GC", ["General Counsel", "GC"]),
-    ("TSL", ["TSL", "Tech Services Leader", "Tech Service Leader"]),
-    ("CISO", ["CISO"]),
+    ("CIO",      "Chief Information Officer",         ["CIO"]),
+    ("TCMO",     "Tech CMO",                          ["Tech CMO", "TCMO"]),
+    ("CHRO",     "Chief Human Resources Officer",     ["CHRO"]),
+    ("CSCO",     "Chief Supply Chain Officer",        ["CSCO"]),
+    ("CMO",      "Chief Marketing Officer",           ["CMO"]),
+    ("CS",       "Customer Service Leader",           ["Customer Service", "CS"]),
+    ("RD",       "R&D Leader",                        ["R&D", "RND", "RD"]),
+    ("CAE",      "Chief Audit Executive",             ["Chief Audit Executive", "CAE"]),
+    ("AIL",      "AI Leader",                         ["AI Leader", "AIL"]),
+    ("CDAO",     "Chief Data and Analytics Officer",  ["CDAO"]),
+    ("CSO",      "Chief Sales Officer",               ["CSO"]),
+    ("TCEO",     "Tech CEO",                          ["Tech CEO", "TCEO"]),
+    ("CPO GBS",  "Chief Procurement Officer",         ["CPO - Procurement (GBS)", "CPO - Procurement", "CPO - GBS", "CPO (GBS)", "CPO GBS"]),
+    ("CPO HT",   "Chief Product Officer",             ["CPO - Product (HT)", "CPO - Product", "CPO - HT", "CPO (HT)", "CPO HT"]),
+    ("CFO",      "Chief Financial Officer",           ["CFO"]),
+    ("GC",       "General Counsel",                   ["General Counsel", "GC"]),
+    ("TSL",      "Tech Services Leader",              ["TSL", "Tech Services Leader", "Tech Service Leader"]),
+    ("CISO",     "Chief Information Security Officer",["CISO"]),
 ]
 
 # Role abbreviation mapping (for email filenames)

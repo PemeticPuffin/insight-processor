@@ -18,8 +18,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import FONT_NAME, FONT_SIZE_PT, EP_URL_SUFFIX
 from utils.date_utils import get_two_mondays_from_now, format_date_for_filename
-from utils.text_utils import get_role_abbreviation
+from utils.text_utils import get_role_abbreviation, get_role_full_name
 from utils.folder_utils import find_matching_subfolder
+from utils.formatting_utils import replace_cxo_in_document
 
 # XML namespace for relationships
 HYPERLINK_TAG = qn('w:hyperlink')
@@ -312,6 +313,8 @@ def split_emails(
 
         log(f"Processing: {job_title} -> {role}")
 
+        full_name = get_role_full_name(job_title)
+
         # Create BD_AE_emails document
         if templates['BD']['heading'] or templates['AE']['heading']:
             bd_ae_doc = create_email_document(
@@ -319,6 +322,8 @@ def split_emails(
                 [templates['BD']['content'], templates['AE']['content']],
                 source_doc
             )
+            if full_name:
+                replace_cxo_in_document(bd_ae_doc, full_name)
             bd_ae_filename = f"{date_prefix}_{role}_BD_AE_emails.docx"
             bd_ae_path = subfolder / bd_ae_filename
 
@@ -334,6 +339,8 @@ def split_emails(
                 source_doc,
                 url_suffix=EP_URL_SUFFIX
             )
+            if full_name:
+                replace_cxo_in_document(ep_doc, full_name)
             ep_filename = f"{date_prefix}_{role}_EP_email.docx"
             ep_path = subfolder / ep_filename
 

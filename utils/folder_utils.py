@@ -23,7 +23,7 @@ def get_role_folder_info(role_name: str) -> Optional[Tuple[str, List[str]]]:
     """
     role_lower = role_name.strip().lower()
 
-    for create_name, synonyms in ROLE_FOLDER_DEFINITIONS:
+    for create_name, _, synonyms in ROLE_FOLDER_DEFINITIONS:
         for synonym in synonyms:
             if synonym.lower() == role_lower:
                 return (create_name, synonyms)

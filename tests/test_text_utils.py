@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.text_utils import sanitize_for_filename, get_role_abbreviation
+from utils.text_utils import sanitize_for_filename, get_role_abbreviation, get_role_full_name
 from config import ROLE_ABBREVIATIONS, ROLE_FOLDER_DEFINITIONS
 
 
@@ -423,3 +423,68 @@ class TestFilenameSecurityConcerns:
             assert "|" not in result
             assert "$" not in result
             assert "`" not in result
+
+
+class TestGetRoleFullName:
+    """Tests for get_role_full_name function."""
+
+    @pytest.mark.parametrize("input_name,expected", [
+        # Canonical folder names
+        ("CIO",      "Chief Information Officer"),
+        ("TCMO",     "Tech CMO"),
+        ("CHRO",     "Chief Human Resources Officer"),
+        ("CSCO",     "Chief Supply Chain Officer"),
+        ("CMO",      "Chief Marketing Officer"),
+        ("CS",       "Customer Service Leader"),
+        ("RD",       "R&D Leader"),
+        ("CAE",      "Chief Audit Executive"),
+        ("AIL",      "AI Leader"),
+        ("CDAO",     "Chief Data and Analytics Officer"),
+        ("CSO",      "Chief Sales Officer"),
+        ("TCEO",     "Tech CEO"),
+        ("CPO GBS",  "Chief Procurement Officer"),
+        ("CPO HT",   "Chief Product Officer"),
+        ("CFO",      "Chief Financial Officer"),
+        ("GC",       "General Counsel"),
+        ("TSL",      "Tech Services Leader"),
+        ("CISO",     "Chief Information Security Officer"),
+    ])
+    def test_canonical_names_return_full_name(self, input_name, expected):
+        """Test that canonical folder names resolve to their full names."""
+        assert get_role_full_name(input_name) == expected
+
+    @pytest.mark.parametrize("synonym,expected", [
+        ("Chief Audit Executive",        "Chief Audit Executive"),
+        ("General Counsel",              "General Counsel"),
+        ("Tech CEO",                     "Tech CEO"),
+        ("Tech CMO",                     "Tech CMO"),
+        ("AI Leader",                    "AI Leader"),
+        ("Customer Service",             "Customer Service Leader"),
+        ("R&D",                          "R&D Leader"),
+        ("CPO - Procurement (GBS)",      "Chief Procurement Officer"),
+        ("CPO - Product (HT)",           "Chief Product Officer"),
+        ("Tech Services Leader",         "Tech Services Leader"),
+        ("Tech Service Leader",          "Tech Services Leader"),
+    ])
+    def test_synonyms_resolve_to_full_name(self, synonym, expected):
+        """Test that role synonyms correctly resolve to the full name."""
+        assert get_role_full_name(synonym) == expected
+
+    def test_case_insensitive_match(self):
+        """Test that matching is case-insensitive."""
+        assert get_role_full_name("cio") == "Chief Information Officer"
+        assert get_role_full_name("CIO") == "Chief Information Officer"
+        assert get_role_full_name("chief audit executive") == "Chief Audit Executive"
+
+    def test_unknown_role_returns_none(self):
+        """Test that unknown roles return None."""
+        assert get_role_full_name("VP of Engineering") is None
+        assert get_role_full_name("Unknown Role") is None
+        assert get_role_full_name("") is None
+
+    def test_all_definitions_have_full_name(self):
+        """Verify every entry in ROLE_FOLDER_DEFINITIONS has a non-empty full name."""
+        for create_name, full_name, synonyms in ROLE_FOLDER_DEFINITIONS:
+            assert full_name, f"{create_name} has no full name"
+            assert isinstance(full_name, str)
+            assert len(full_name.strip()) > 0
