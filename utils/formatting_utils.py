@@ -227,8 +227,8 @@ def replace_cxo_in_document(doc, full_name: str):
     """
     for para in doc.paragraphs:
         for run in para.runs:
-            if 'CXO' in run.text:
-                run.text = run.text.replace('CXO', full_name)
+            if re.search(r'CXO', run.text, re.IGNORECASE):
+                run.text = re.sub(r'CXO', full_name, run.text, flags=re.IGNORECASE)
 
 
 def add_spacing_after(paragraph, points: int = 12):

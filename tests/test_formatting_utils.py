@@ -8,6 +8,7 @@ These tests challenge formatting functions with:
 - Font and style preservation
 """
 
+import pytest
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -347,15 +348,17 @@ class TestReplaceCxoInDocument:
         assert para.runs[0].bold == True
         assert "General Counsel" in para.text
 
-    def test_case_sensitive_no_replace_lowercase(self):
-        """Test that lowercase 'cxo' is not replaced (placeholder is always uppercase)."""
+    @pytest.mark.parametrize("variant", ["CXO", "cxo", "Cxo", "CxO", "cXo", "CXo"])
+    def test_case_insensitive_replacement(self, variant):
+        """Test that all case variants of CXO are replaced."""
         doc = Document()
         para = doc.add_paragraph()
-        para.add_run("cxo should not change")
+        para.add_run(f"Hello {variant} welcome")
 
         replace_cxo_in_document(doc, "Chief Information Officer")
 
-        assert para.text == "cxo should not change"
+        assert variant not in para.text
+        assert "Chief Information Officer" in para.text
 
     def test_empty_document(self):
         """Test with a document that has no paragraphs with text."""
