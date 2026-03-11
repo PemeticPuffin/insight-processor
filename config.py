@@ -20,7 +20,6 @@ HEADERS_TO_BOLD = [
 # Content is bulleted from each header until the next header in HEADERS_TO_BOLD
 BULLET_SECTION_HEADERS = [
     "Why This Matters",
-    "Implications",
     "Probing Questions",
     "AskGartner Prompts to Recommend",
     "Key Terms",
